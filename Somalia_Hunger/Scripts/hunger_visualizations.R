@@ -98,6 +98,7 @@ modsev_plot <- insecurity_ms |>
     y = "% of population insecure",
     fill = "Country/Grouping"
   )
+ggsave("Somalia_Hunger/Visualizations/Mod_Sev_Insecurity.png")
 
 sev_plot <- insecurity_s |>
   ggplot(aes(x = Country.Name, y = pct, fill = Country.Name)) +
@@ -108,6 +109,5 @@ sev_plot <- insecurity_s |>
     y = "% of population insecure",
     fill = "Country/Grouping"
   )
+ggsave("Somalia_Hunger/Visualizations/Sev_Insecurity.png")
 
-modsev_plot
-sev_plot
