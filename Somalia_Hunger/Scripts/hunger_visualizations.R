@@ -181,3 +181,14 @@ ipc_p3_plot <- ipc_pct |> filter(phase == "Phase 3+") |>
     title = ""
   )
 
+#Stunting
+stunting_modeled <- wbstats::wb_data(indicator = "SH.STA.STNT.ME.ZS",
+                                     start_date = 2000,
+                                     end_date = 2026,
+                                     lang = "en",
+                                     country = benchmarks)
+
+stunting_modeled_plot <- stunting_modeled |>
+  ggplot(aes(x=date, y = SH.STA.STNT.ME.ZS, color = country)) +
+  geom_line(linewidth = 0.75)
+ggsave("Somalia_Hunger/Visualizations/Modeled_Stunting.png")
