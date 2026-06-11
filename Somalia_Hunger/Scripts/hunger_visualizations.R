@@ -190,5 +190,11 @@ stunting_modeled <- wbstats::wb_data(indicator = "SH.STA.STNT.ME.ZS",
 
 stunting_modeled_plot <- stunting_modeled |>
   ggplot(aes(x=date, y = SH.STA.STNT.ME.ZS, color = country)) +
-  geom_line(linewidth = 0.75)
+  geom_line(linewidth = 0.75) +
+  labs(
+    title = "Prevalence of Stunting, (% of Population",
+    x = "Year",
+    y = "Percent",
+    color = "Country/Grouping"
+  )
 ggsave("Somalia_Hunger/Visualizations/Modeled_Stunting.png")
