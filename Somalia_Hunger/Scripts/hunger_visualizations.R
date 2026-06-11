@@ -1,5 +1,7 @@
 library(tidyverse)
 library(readxl)
+library(lubridate)
+library(trackr)
 
 
 ## vectors for benchmarks and makeshift benchmarks
@@ -110,4 +112,72 @@ sev_plot <- insecurity_s |>
     fill = "Country/Grouping"
   )
 ggsave("Somalia_Hunger/Visualizations/Sev_Insecurity.png")
+
+
+# Load in IPC data
+ipc0 <- read_excel("Somalia_Hunger/Data/IPC_Population_Analysis_Styled_2017,2027_1781118839874.xlsx") |>
+  select(1:"Current - Phase 3+ %") |>
+  filter(!is.na(`Country Population`) & !is.na(`Current - Analysis Period`)) |>
+  filter(`Country/Analysis Name/Group Name` != "SO: Acute Food Insecurity Analysis January 2026")
+ipc1 <- read_excel("Somalia_Hunger/Data/IPC_Population_Analysis_Styled_2017,2027_1781119874050.xlsx") |>
+  select(1:"Current - Phase 3+ %") |>
+  filter(!is.na(`Country Population`))
+ipc <- bind_rows(ipc0, ipc1)
+ipc <- ipc |> 
+  rename(population = `Country Population`, date = `Date of Analysis`) |>
+  mutate(date = ymd_hms(date))
+
+
+## Data with population
+ipc_pop <- ipc |>
+  select(population, date, ends_with("Pop")) |>
+  rename_with(~gsub("Current - ", "", .x)) |>
+  rename_with(~gsub(" Pop", "", .x))
+ipc_pop <- ipc_pop |>
+  pivot_longer(cols = `Phase 1`:`Phase 3+`,
+               names_to = "phase",
+               values_to = "pop") |>
+  mutate(pop_scaled = pop/1000000)
+
+## Data with percents
+ipc_pct <- ipc |>
+  select(population, date, ends_with("%")) |>
+  rename_with(~gsub("Current - ", "", .x)) |>
+  rename_with(~gsub(" %", "", .x))
+ipc_pct <- ipc_pct |>
+  pivot_longer(cols = `Phase 1`:`Phase 3+`,
+               names_to = "phase",
+               values_to = "pct")
+
+
+# IPC Visualizations
+ipc_pop_plot <- ipc_pop |> filter(phase != "Phase 3+") |>
+  ggplot(aes(x = date, y = pop_scaled, fill = phase)) +
+  geom_area() +
+  labs(
+    title = "IPC Food Insecurity Classifications, by Population",
+    subtitle = "Somalia 2017-2026",
+    x = "Date",
+    y = "Population (Millions)",
+    fill = ""
+  )
+ggsave("Somalia_Hunger/Visualizations/IPC_Phases_Pop.png")
+
+ipc_pct_plot <- ipc_pct |> filter(phase != "Phase 3+") |>
+  ggplot(aes(x = date, y = pct, fill = phase)) +
+    geom_area() +
+  labs(
+    title = "IPC Food Insecurity Classifications, (% of Population)",
+    subtitle = "Somalia 2017-2026",
+    x = "Date",
+    y = "Percent",
+    fill = ""
+  )
+ggsave("Somalia_Hunger/Visualizations/IPC_Phases_Pct.png")
+
+ipc_p3_plot <- ipc_pct |> filter(phase == "Phase 3+") |>
+  ggplot(aes(x = date, y = pct)) + geom_line() +
+  labs(
+    title = ""
+  )
 
