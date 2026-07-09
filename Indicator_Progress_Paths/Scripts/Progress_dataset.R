@@ -46,19 +46,22 @@
 
 
 
-## set wd to the folder that you download this folder that Indicator_Progress_Paths folder is downloaded into
-setwd("C:/Users/wb661549/OneDrive - WBG/Desktop/Internship/WB")
-
 rm(list = ls())
 library(tidyverse)
 library(trackr)
 library(readxl)
 library(wbstats)
 
+## set wd to the folder that you download this folder that Indicator_Progress_Paths folder is downloaded into
+setwd("C:/Users/wb661549/OneDrive - WBG/Desktop/Internship/WB/Indicator_Progress_Paths")
+input_dir <- "input"
+output_dir <- "Outputs"
+
+
 ## Getting parameters
-meta <- read.csv("Indicator_Progress_Paths/input/meta_sheet.csv") |>
+meta <- read.csv(file.path(input_dir, "meta_sheet.csv")) |>
   collapse::fmutate(best = ifelse(more_is_better == 1, "high", "low"))
-meta_new <- read.csv("Indicator_Progress_Paths/input/meta_sheet_new.csv") |>
+meta_new <- read.csv(file.path(input_dir, "meta_sheet_new.csv")) |>
   collapse::fmutate(best = ifelse(more_is_better == 1, "high", "low"))
 
 
@@ -115,7 +118,7 @@ for (tracked_indicator in indicator_list) {
     geom_line() +
     labs(title = metadata$indicatorname)
   print(typical_path_plot)
-  ggsave(paste0("Indicator_Progress_Paths/Outputs/", tracked_indicator, "_plot.png"),
+  ggsave(paste0(output_dir, tracked_indicator, "_plot.png"),
          plot = typical_path_plot)
   
   ### Combining with indicator_paths dataframe
@@ -130,7 +133,7 @@ for (tracked_indicator in indicator_list) {
 
 
 ## Getting water data from JMP_2025_WLD.xlsx
-water <- read_excel("Indicator_Progress_Paths/input/JMP_2025_WLD.xlsx", sheet = "wat") |>
+water <- read_excel(file.path(input_dir, "JMP_2025_WLD.xlsx"), sheet = "wat") |>
   select(iso3,
          year,
          wat_sm_t,
@@ -180,14 +183,8 @@ for (tracked_indicator in c("wat_sm_t",
     geom_line() +
     labs(title = tracked_indicator)
   print(typical_path_plot)
-  ggsave(
-    paste0(
-      "Indicator_Progress_Paths/Outputs/",
-      tracked_indicator,
-      "_plot.png"
-    ),
-    plot = typical_path_plot
-  )
+  ggsave(paste0(output_dir, tracked_indicator, "_plot.png"),
+         plot = typical_path_plot)
   
   ### Combining with indicator_paths dataframe
   indicator_paths <- indicator_paths |> full_join(typical_path, by = "time")
@@ -196,8 +193,8 @@ for (tracked_indicator in c("wat_sm_t",
 
 
 ### Saving the Datasets ###
-write.csv(indicator_paths, "Indicator_Progress_Paths/Outputs/indicator_typical_paths.csv")
-write.csv(future_paths, "Indicator_Progress_Paths/Outputs/country_future_paths.csv")
+write.csv(indicator_paths, file.path(output_dir, "indicator_typical_paths.csv"))
+write.csv(future_paths, file.path(output_dir, "country_future_paths.csv"))
 
 
 
@@ -209,7 +206,7 @@ write.csv(future_paths, "Indicator_Progress_Paths/Outputs/country_future_paths.c
 
 
 ### Data for Direct Downloads is not working ###
-
+stop("this part isn't working yet")
 
 ## List for indicators with data in the input file
 data_list <- c("electricity",
@@ -221,11 +218,11 @@ data_list <- c("electricity",
 
 
 ## Loading parameters
-load("Indicator_Progress_Paths/input/parameters.Rda")
+load(file.path(input_dir, "parameters.Rda"))
 
 
 
-load( "Indicator_Progress_Paths/input/education.Rda")
+load(file.path(input_dir, "education.Rda"))
 data <- get("education") |>
   filter(!is.na(education))
 metadata <- meta_new |> filter(dataname == "education")
