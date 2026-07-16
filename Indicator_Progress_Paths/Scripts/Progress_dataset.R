@@ -116,7 +116,7 @@ for (tracked_indicator in indicator_list) {
     rename(!!tracked_indicator := y)
   country_future_path <- progress$path_future$speed |>
     select(-speed_source) |>
-    rename(!!paste0(tracked_indicator, "_fut") := y_fut)
+    rename(!!tracked_indicator := y_fut)
   
   ### Creating Typical path plot
   typical_path_plot <- typical_path |>
@@ -182,7 +182,7 @@ for (tracked_indicator in c("wat_sm_t",
     rename(!!tracked_indicator := y)
   country_future_paths <- progress$path_future$speed |>
     select(-speed_source) |>
-    rename(!!paste0(tracked_indicator, "_fut") := y_fut)
+    rename(!!tracked_indicator := y_fut)
   
   ### Creating Typical path plot
   typical_path_plot <- typical_path |>
@@ -256,7 +256,7 @@ for (tracked_indicator in data_list) {
     rename(!!tracked_indicator := y)
   country_future_paths <- progress$path_future$speed |>
     select(-speed_source) |>
-    rename(!!paste0(tracked_indicator, "_fut") := y_fut)
+    rename(!!tracked_indicator := y_fut)
   
   ### Creating Typical path plot
   typical_path_plot <- typical_path |>
@@ -275,14 +275,21 @@ for (tracked_indicator in data_list) {
 
 
 
-####################################
-### Saving the combined datasets ###
-####################################
+##################################################################
+### Converting to long format and saving the combined datasets ###
+##################################################################
 
-write.csv(indicator_paths, file.path(input_dir, "indicator_typical_paths.csv"))
-write.csv(future_paths, file.path(input_dir, "country_future_paths.csv"))
+indicator_paths <- indicator_paths |>
+  pivot_longer(cols = -time,
+               names_to = "indicator",
+               values_to = "value")
+future_paths <- future_paths |>
+  pivot_longer(cols = -c(code, year, speed),
+               names_to = "indicator",
+               values_to = "value") 
 
-
+write.csv(indicator_paths, file.path(output_dir, "indicator_typical_paths.csv"))
+write.csv(future_paths, file.path(output_dir, "country_future_paths.csv"))
 
 
 
