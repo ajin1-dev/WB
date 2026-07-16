@@ -58,6 +58,7 @@ library(tidyverse)
 library(trackr)
 library(readxl)
 library(wbstats)
+library(ggrepel)
 
 ## Getting parameters for the indicators
 meta <- read.csv(file.path(input_dir, "meta_sheet.csv")) |>
@@ -274,23 +275,45 @@ for (tracked_indicator in data_list) {
 
 
 
-
 ##################################################################
 ### Converting to long format and saving the combined datasets ###
 ##################################################################
 
-indicator_paths <- indicator_paths |>
+indicator_paths_long <- indicator_paths |>
   pivot_longer(cols = -time,
                names_to = "indicator",
-               values_to = "value")
-future_paths <- future_paths |>
+               values_to = "value") |>
+  filter(!is.na(value))
+future_paths_long <- future_paths |>
   pivot_longer(cols = -c(code, year, speed),
                names_to = "indicator",
-               values_to = "value") 
+               values_to = "value") |>
+  filter(!is.na(value))
 
-write.csv(indicator_paths, file.path(output_dir, "indicator_typical_paths.csv"))
-write.csv(future_paths, file.path(output_dir, "country_future_paths.csv"))
+write.csv(indicator_paths_long, file.path(output_dir, "indicator_typical_paths.csv"))
+write.csv(future_paths_long, file.path(output_dir, "country_future_paths.csv"))
 
+##################################################################
+### Creating Line Graph with all the indicators' typical paths ###
+##################################################################
+
+indicator_paths_plot <- indicator_paths_long |>
+  group_by(indicator) |>
+  mutate(label = if_else(time == max(time), as.character(indicator), NA_character_)) |>
+  ungroup() |>
+  ggplot(aes(x = time, y = value, color = indicator)) + 
+  geom_line() + 
+  geom_label_repel(aes(label = label),
+                   nudge_x = max(indicator_paths_long$time) * 0.05,
+                   direction = "both",
+                   hjust = 0,
+                   segment.color = "black",
+                   na.rm = FALSE) +
+  theme_minimal() +
+  theme(legend.position = "none")
+  
+
+ggsave(plot = indicator_paths_plot, file.path(output_dir, "indicator_paths.png"), width = 10, height = 5)
 
 
 
