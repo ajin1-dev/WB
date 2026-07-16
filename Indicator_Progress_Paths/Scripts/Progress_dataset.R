@@ -47,22 +47,28 @@
 
 
 rm(list = ls())
+
+
+## set wd to the folder that you download this folder that Indicator_Progress_Paths folder is downloaded into
+setwd("C:/Users/wb661549/OneDrive - WBG/Desktop/Internship/WB")
+input_dir <- "Indicator_Progress_Paths/input"
+output_dir <- "Indicator_Progress_Paths/Outputs"
+
 library(tidyverse)
 library(trackr)
 library(readxl)
 library(wbstats)
 
-## set wd to the folder that you download this folder that Indicator_Progress_Paths folder is downloaded into
-setwd("C:/Users/wb661549/OneDrive - WBG/Desktop/Internship/WB/Indicator_Progress_Paths")
-input_dir <- "input"
-output_dir <- "Outputs"
-
-
-## Getting parameters
+## Getting parameters for the indicators
 meta <- read.csv(file.path(input_dir, "meta_sheet.csv")) |>
   collapse::fmutate(best = ifelse(more_is_better == 1, "high", "low"))
 meta_new <- read.csv(file.path(input_dir, "meta_sheet_new.csv")) |>
   collapse::fmutate(best = ifelse(more_is_better == 1, "high", "low"))
+
+
+#########################################################
+### Calculations for data downloaded from from WB API ###
+#########################################################
 
 
 ## Setting up list of indicators with data accessible through WB API
@@ -118,7 +124,7 @@ for (tracked_indicator in indicator_list) {
     geom_line() +
     labs(title = metadata$indicatorname)
   print(typical_path_plot)
-  ggsave(paste0(output_dir, tracked_indicator, "_plot.png"),
+  ggsave(paste0(output_dir, "/", tracked_indicator, "_plot.png"),
          plot = typical_path_plot)
   
   ### Combining with indicator_paths dataframe
@@ -129,10 +135,11 @@ for (tracked_indicator in indicator_list) {
 
 
 
+#################################################
+### Getting water data from JMP_2025_WLD.xlsx ###
+#################################################
 
 
-
-## Getting water data from JMP_2025_WLD.xlsx
 water <- read_excel(file.path(input_dir, "JMP_2025_WLD.xlsx"), sheet = "wat") |>
   select(iso3,
          year,
@@ -183,7 +190,7 @@ for (tracked_indicator in c("wat_sm_t",
     geom_line() +
     labs(title = tracked_indicator)
   print(typical_path_plot)
-  ggsave(paste0(output_dir, tracked_indicator, "_plot.png"),
+  ggsave(paste0(output_dir, "/", tracked_indicator, "_plot.png"),
          plot = typical_path_plot)
   
   ### Combining with indicator_paths dataframe
@@ -192,88 +199,48 @@ for (tracked_indicator in c("wat_sm_t",
 }
 
 
-### Saving the Datasets ###
-write.csv(indicator_paths, file.path(output_dir, "indicator_typical_paths.csv"))
-write.csv(future_paths, file.path(output_dir, "country_future_paths.csv"))
 
 
 
+#######################################################
+### List for indicators with data in the input file ###
+#######################################################
 
-
-
-
-
-
-
-### Data for Direct Downloads is not working ###
-stop("this part isn't working yet")
-
-## List for indicators with data in the input file
+## Creating list of all the files
 data_list <- c("electricity",
-               "education",
                "ghggdp",
                "lifeexpectancy",
-               "gender")
-
-
+               "gender",
+               "education")
 
 ## Loading parameters
 load(file.path(input_dir, "parameters.Rda"))
 
 
-
-load(file.path(input_dir, "education.Rda"))
-data <- get("education") |>
-  filter(!is.na(education))
-metadata <- meta_new |> filter(dataname == "education")
-progress <- track_progress(
-  data = data,
-  indicator = "education",
-  code_col = "code",
-  year_col = "year",
-  startyear_data = 1950,
-  endyear_data = 2023,
-  eval_from = 2015,
-  eval_to = 2023,
-  speed = TRUE,
-  percentiles = FALSE,
-  future = FALSE, ## TRUE,
-  target_year = 2030,
-  sequence_pctl = seq(20, 80, 20),
-  sequence_speed = c(0.25, 0.5, 1, 2, 4),
-  best = "high",
-  support = 1,
-  granularity = 0.1,
-  verbose = TRUE)
-
-
-
-
-
-
-
-
-
-#### Testing ####
-
-
-
-
-## Getting Data, Creating typical path, then plotting and saving plot
 for (tracked_indicator in data_list) {
-  load(paste0(
-    "Indicator_Progress_Paths/input/", tracked_indicator, ".Rda"))
-  data <- get(tracked_indicator)
-  metadata <- parameters |> filter(indicator == tracked_indicator)
+  
+  load(paste0(input_dir, "/", tracked_indicator, ".Rda"))
+  ## Removes any duplicates from multiple sources
+  data <- get(tracked_indicator) |>
+    rename("value" = all_of(tracked_indicator)) |>
+    filter(!is.na(value)) |>
+    pivot_wider(names_from = source,
+              values_from = value) |>
+    mutate(value = ifelse(is.na(`1`), `2`, `1`))
+  
+  print(tracked_indicator)
+
+  ## Calculates the future paths
+  metadata <- meta_new |> filter(dataname == tracked_indicator)
   progress <- track_progress(
     data = data,
-    indicator = tracked_indicator,
+    indicator = "value",
     code_col = "code",
     year_col = "year",
     startyear_data = min(data$year),
     endyear_data = max(data$year),
-    eval_from = (max(data$year) - 5),
-    eval_to = max(data$year),
+    eval_from = 2015,
+    eval_to = 2023,
     speed = TRUE,
     percentiles = FALSE,
     future = TRUE,
@@ -281,12 +248,12 @@ for (tracked_indicator in data_list) {
     sequence_pctl = seq(20, 80, 20),
     sequence_speed = c(0.25, 0.5, 1, 2, 4),
     best = metadata$best,
-    support = metadata$support,
-    granularity = metadata$granularity)
-  print(metadata$label)
+    support = 1,
+    granularity = 0.1,
+    verbose = TRUE)
+  
   typical_path <- progress$predicted_changes$path_speed |>
     rename(!!tracked_indicator := y)
-  
   country_future_paths <- progress$path_future$speed |>
     select(-speed_source) |>
     rename(!!paste0(tracked_indicator, "_fut") := y_fut)
@@ -295,104 +262,29 @@ for (tracked_indicator in data_list) {
   typical_path_plot <- typical_path |>
     ggplot(aes(x = time, y = !!sym(tracked_indicator))) +
     geom_line() +
-    labs(title = metadata$label)
+    labs(title = tracked_indicator)
   print(typical_path_plot)
-  ggsave(
-    paste0(
-      "Indicator_Progress_Paths/Outputs/",
-      tracked_indicator,
-      "_plot.png"
-    ),
-    plot = typical_path_plot
-  )
+  ggsave(paste0(output_dir, "/", tracked_indicator, "_plot.png"),
+         plot = typical_path_plot)
   
   ### Combining with indicator_paths dataframe
   indicator_paths <- indicator_paths |> full_join(typical_path, by = "time")
   future_paths <- future_paths |> full_join(country_future_paths, by = c("code", "year", "speed"))
-  
 }
 
 
 
 
+####################################
+### Saving the combined datasets ###
+####################################
+
+write.csv(indicator_paths, file.path(input_dir, "indicator_typical_paths.csv"))
+write.csv(future_paths, file.path(input_dir, "country_future_paths.csv"))
 
 
 
 
 
-#### TESTING ####
-stop("testing")
-test <- wbstats::wb_data(indicator = "SL.TLF.ACTI.FE.ZS",
-                         lang = "en",
-                         country = "countries_only")
-result <- track_progress(
-  data = test,
-  indicator = "SL.TLF.ACTI.FE.ZS",
-  code_col = "iso3c",
-  year_col = "date",
-  startyear_data = 1990,
-  endyear_data = 2025,
-  eval_from = 2015,
-  eval_to = 2025,
-  speed = TRUE,
-  percentiles = FALSE,
-  future = TRUE,
-  target_year = 2030,
-  sequence_pctl = seq(20, 80, 20),
-  sequence_speed = c(0.25, 0.5, 1, 2, 4),
-  best = "high",
-  support = 1,
-  granularity = 0.1
-)
-
-typical_path <- result$predicted_changes$path_speed
-
-### Creating Typical path plot
-typical_path_plot <- typical_path |>
-  ggplot(aes(x = time, y = y)) +
-  geom_line() + labs(title = "FLFP Outside of the loop, inputted values")
-ggsave(
-  "Indicator_Progress_Paths/Outputs/FLFP Outside of the loop, inputted values.png"
-)
 
 
-
-metadata <- meta |> filter(indicator == "SL.TLF.ACTI.FE.ZS")
-
-test <- wbstats::wb_data(indicator = "SL.TLF.ACTI.FE.ZS",
-                         lang = "en",
-                         country = "countries_only")
-
-result <- track_progress(
-  data = test,
-  indicator = "SL.TLF.ACTI.FE.ZS",
-  code_col = "iso3c",
-  year_col = "date",
-  startyear_data = 1990,
-  endyear_data = 2025,
-  eval_from = 2015,
-  eval_to = 2025,
-  speed = TRUE,
-  percentiles = TRUE,
-  future = FALSE,
-  target_year = 2030,
-  sequence_pctl = seq(20, 80, 20),
-  sequence_speed = c(0.25, 0.5, 1, 2, 4),
-  best = "high",
-  support = 1,
-  granularity = 0.1,
-  verbose = TRUE
-)
-
-typical_path <- result$predicted_changes$path_speed
-
-### Creating Typical path plot
-typical_path_plot <- typical_path |>
-  ggplot(aes(x = time, y = y)) +
-  geom_line() + labs(title = "FLFP")
-
-
-
-ggsave(
-  "Indicator_Progress_Paths/Outputs/FLFP"
-)
