@@ -1,0 +1,811 @@
+---
+title: "Togo_Hunger_Visualizations"
+output: html_document
+---
+
+```{r setup, echo = FALSE, message = FALSE}
+knitr::opts_knit$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(trackr)
+library(ggrepel)
+library(wbstats)
+
+# setwd()
+input_dir <- "Data"
+output_dir <- "Visualizations"
+
+```
+
+```{r benchmarks, echo = FALSE}
+benchmarks = c("TGO", "SSF", "XN", "WLD", "AFW")
+classifications <- read_excel(file.path(input_dir, "country_classifications.xlsx"))
+low_inc_codes <- classifications |>
+  filter(`Income group` == "Lower middle income") |>
+  pull(Code)
+ssa_codes <- classifications |>
+  filter(Region == "Sub-Saharan Africa") |>
+  pull(Code)
+afw_codes <- classifications |>
+  filter(Economy %in% c("Benin", "Burkina Faso", "Cabo Verde", "Cameroon",
+                        "Central African Republic", "Chad", "Congo, Rep.", "Côte d’Ivoire",
+                        "Equatorial Guinea", "Gabon", "Gambia, The", "Ghana",
+                        "Guinea", "Guinea-Bissau", "Liberia", "Mali",
+                        "Mauritania", "Niger", "Nigeria", "Senegal",
+                        "Sierra Leone", "Togo")) |>
+  pull(Code)
+country_pops <- wbstats::wb_data(indicator = c(population = "SP.POP.TOTL"), lang = "en", country = "countries_only") |>
+  select(iso3c, population, date)
+```
+
+---
+
+## Prevalence of Undernourishment
+
+```{r, echo = FALSE}
+## Prevalence of undernourishment (% of population); ind = SN.ITK.DEFC.ZS
+pou <- wb_data(indicator = c(pou = "SN.ITK.DEFC.ZS"), country = "all") |>
+  filter(!is.na(pou))
+```
+
+
+
+```{r, echo = FALSE, warning = FALSE}
+pou_plot <- pou |>
+  filter(iso3c %in% benchmarks) |>
+  mutate(label = if_else(date == max(date), as.character(country), NA_character_),
+         highlight = (iso3c == "TGO")) |>
+  ggplot(aes(x = date, y = pou, group = country, color = highlight)) +
+  theme_minimal() +
+  geom_line() +
+  theme(
+    legend.position = "none") +
+  labs(title = "Togo and Comparision Groups",
+       subtitle = "Prevalence of Undernourishment, % of Population",
+       x = "",
+       y = "") +
+  scale_color_manual(values = c("#8A969F", "#0071BC")) +
+  geom_vline(xintercept = 2023, linetype = "dashed", color = "black") +
+  annotate("text",
+           x = 2020.25, 
+           y = 27,
+           label = "2023: Data ends",
+           fontface = "italic",
+           size = 3.5) + 
+  geom_label_repel(aes(label = label),
+                  nudge_x = 7.5,
+                  direction = "y",
+                  hjust = 0.5,
+                  segment.color = NA,
+                  na.rm = TRUE)  +
+  theme(plot.subtitle = element_text(face = "italic"))
+# ggsave("Visualizations/Pct_Undernourishment.png")
+pou_plot
+```
+
+
+```{r, echo = FALSE, warning = FALSE}
+## Line chart with FCS Countries
+
+pou_afw_plot <- pou |>
+  filter(iso3c %in% afw_codes) |>
+  mutate(label = if_else(date == max(date) & iso3c == "TGO", as.character(country), NA_character_),
+         highlight = (iso3c == "TGO")) |>
+  ggplot(aes(x = date, y = pou, group = country, color = highlight)) +
+  theme_minimal() +
+  geom_line() +
+  scale_x_discrete(breaks = seq(2001, 2023, by = 5)) +
+  labs(title = "Prevalence of Undernourishment, % of Population",
+       x = "",
+       y = "",
+       color = "Country") +
+  scale_color_manual(values = c("FALSE" = "#8A969F", "TRUE" = "#0071BC"),
+                     labels = c("FALSE" = "Africa West and Central", "TRUE" = "Somalia")) + 
+  geom_vline(xintercept = 2023, linetype = "dashed", color = "black") +
+  annotate("text",
+           x = 2020.25, 
+           y = 43,
+           label = "2023: Data ends",
+           fontface = "italic",
+           size = 3.5)
+
+pou_afw_plot
+```
+
+
+
+```{r, echo = FALSE, warning = FALSE}
+pou_arrow <- pou |>
+  filter(iso3c %in% afw_codes) |>
+  filter(date == 2023 | date == 2015) |>
+  mutate(pou = pou / 100) |>
+  pivot_wider(names_from = date, values_from = pou, names_prefix = "pou_") |>
+  filter(!is.na(pou_2015) | !is.na(pou_2023)) |>
+  mutate(highlight = (country == "Togo"))
+
+pou_arrow_plot1 <- pou_arrow |>
+  ggplot() +
+  geom_segment(aes(x = reorder(country, -pou_2023), xend = reorder(country, pou_2023),
+                   y = pou_2015, yend = pou_2023, color = highlight),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed")) +
+  geom_point(aes(x = reorder(country, -pou_2023), y = pou_2015, color = highlight), size = 1) +
+  scale_color_manual(
+    values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+    labels = c("TRUE" = "Togo", "FALSE" = "Africa West and Central"),
+    name = NULL
+  ) +
+  labs(x = "",
+       y = "",
+       title = "Prevalence of Undernourishment Change from 2015-2023",
+       subtitle = "% of Population, Sorted by End Year Value") +
+  theme_minimal() +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent)
+pou_arrow_plot1
+```
+
+
+```{r, echo = FALSE, warning = FALSE}
+pou_arrow_plot2 <- pou_arrow |>
+  ggplot() +
+  geom_segment(aes(x = reorder(country, -pou_2015), xend = reorder(country, pou_2015),
+                   y = pou_2015, yend = pou_2023,
+                   color = highlight),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed")) +
+  geom_point(aes(x = reorder(country, -pou_2015), y = pou_2015, color = highlight), size = 1) +
+  scale_color_manual(
+    values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+    labels = c("TRUE" = "Togo", "FALSE" = "Africa West and Central"),
+    name = NULL
+  ) +
+  labs(x = "",
+       y = "",
+       title = "Prevalence of Undernourishment Change from 2015-2023",
+       subtitle = "% of Population, Sorted by Start Year Value") +
+  theme_minimal() +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent)
+pou_arrow_plot2
+
+```
+
+
+---
+
+## FIES Data
+
+```{r, echo = FALSE}
+## Prevalence of moderate or severe food insecurity in the population (%); ind = SN.ITK.MSFI.ZS
+fies_insecurity <- wb_data(indicator = c(mod_sev = "SN.ITK.MSFI.ZS", sev = "SN.ITK.SVFI.ZS"), country = "all") |>
+  filter(!is.na(mod_sev) & !is.na(sev)) |>
+  group_by(iso3c) |>
+  mutate(label = if_else(date == max(date, na.rm = TRUE), as.character(country), NA_character_)) |>
+  ungroup() |>
+  mutate(highlight = (iso3c == "TGO"))
+```
+
+
+
+```{r, echo = FALSE}
+modsev_plot <- fies_insecurity |>
+  filter(iso3c %in% benchmarks) |>
+  ggplot(aes(x = date, y = mod_sev, group = country, color = highlight)) +
+  geom_line() +
+  theme_minimal() +
+  labs(
+    title = "Prevalence of Moderate or Severe Food Insecurity, % of Population",
+    x = "",
+    y = "") + 
+  scale_fill_manual(values = c("#8A969F", "#0071BC")) +
+  theme(legend.position = "none") +
+  scale_color_manual(values = c("FALSE" = "#8A969F", "TRUE" = "#0071BC")) +
+  geom_label_repel(aes(label = label),
+                   nudge_y = -2,
+                   direction = "both",
+                   hjust = 0.5,
+                   segment.color = NA,
+                   na.rm = TRUE) +
+  theme(plot.subtitle = element_text(face = "italic"))
+
+# ggsave(file.path(output_dir, "Mod_Sev_Insecurity.png"))
+modsev_plot
+
+
+sev_plot <- fies_insecurity |>
+  filter(iso3c %in% benchmarks) |>
+  ggplot(aes(x = date, y = sev, group = country, color = highlight)) +
+  geom_line() +
+  theme_minimal() +
+  labs(
+    title = "Prevalence of Severe Food Insecurity, % of Population",
+    x = "",
+    y = "") + 
+  scale_fill_manual(values = c("#8A969F", "#0071BC")) +
+  theme(legend.position = "none") +
+  scale_color_manual(values = c("FALSE" = "#8A969F", "TRUE" = "#0071BC")) +
+  geom_label_repel(aes(label = label),
+                   nudge_y = 0,
+                   direction = "both",
+                   hjust = 0.5,
+                   segment.color = NA,
+                   na.rm = TRUE) +
+  theme(plot.subtitle = element_text(face = "italic"))
+
+# ggsave(file.path(output_dir, "Sev_Insecurity.png"))
+sev_plot
+
+```
+
+
+
+```{r, warning = FALSE, echo = FALSE}
+# FCS Comparison charts
+  
+fies_afw_barplot <- fies_insecurity |>
+  filter(iso3c %in% afw_codes,
+         date == 2023) |>
+  mutate(country = fct_reorder(country, -mod_sev),
+         mod_sev = mod_sev / 100) |>
+  ggplot(aes(x = country, y = mod_sev, fill = highlight)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip() +
+  labs(
+    title = "2023: Prevalence of Moderate and Severe Food Insecurity",
+    subtitle = "% of Population, 2026 FCS Countries",
+    y = "",
+    x = "") +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("#8A969F", "#0071BC"))
+fies_afw_barplot
+
+fies_afw_lineplot <- fies_insecurity |>
+  filter(iso3c %in% afw_codes) |>
+  ggplot(aes(x = date, y = mod_sev, group = country, color = highlight)) +
+  geom_line() +
+  scale_color_manual(values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+                     labels = c("TRUE" = "Togo", "FALSE" = "African West and Central")) +
+  theme_minimal() +
+  labs(
+    title = "Prevalence of Moderate and Severe Food Insecurity",
+    subtitle = "Africa West and Central",
+    x = "",
+    y = "",
+    color = "") +
+  theme(plot.subtitle = element_text(face = "italic"))
+
+
+fies_afw_lineplot
+```
+
+
+``` {r, echo = FALSE, warning = FALSE, message = FALSE}
+ipc_dashboard <- read.csv(file.path(input_dir, "IPC_CH_numbers_by_country_29-6-2026.csv"), skip = 1) |>
+  filter(Coverage != "") |>
+  select(-c(Period.from, Period.to, IPC.CH)) |>
+  pivot_longer(cols=Phase.1:Phase.5,
+               names_to = "Phase",
+               values_to = "value") |>
+  mutate(highlight = (Country == "Togo")) |>
+  filter(Phase != "Phase.3.") |> 
+  mutate(Country = case_when(
+    Country == "Democratic Republic of the Congo" ~ "Congo DR",
+    Country == "United Republic of Tanzania" ~ "Tanzania",
+    TRUE ~ Country)) |>
+  mutate(Country = fct_reorder(Country, Phase.3.), 
+         Country = fct_reorder(Country, highlight))
+
+ipc_dashboard_plot <- ipc_dashboard |>
+  mutate(value = value / 100) |>
+  ggplot(aes(x = Country, y = value, fill = Phase)) +
+  geom_col() +
+  theme_minimal() +
+  labs(
+    title = "Togo in comparison to other IPC/CH Countries",
+    subtitle = "Most Recent 2026 IPC/CH Classification by Country, % of Population",
+    x = "",
+    y = "",
+    fill = "") +
+  coord_flip() +
+  scale_fill_manual(
+  values = c('#e3f6fd', '#b6d4f1', '#8b6486', '#7f3f4d', '#691b15'),
+  labels = c("Phase.1" = "Phase 1", "Phase.2" = "Phase 2", "Phase.3" = "Phase 3", "Phase.4" = "Phase 4", "Phase.5" = "Phase 5")) +
+  scale_y_continuous(breaks = seq(0, 1, by = .20), labels = scales::percent) +
+  theme(plot.subtitle = element_text(face = "italic"))
+
+ipc_dashboard_plot
+
+```
+
+```{r Loading in Data, message=FALSE, echo = FALSE, warning = FALSE}
+stunting_modeled <- wbstats::wb_data(indicator = "SH.STA.STNT.ME.ZS",
+                                     start_date = 2000,
+                                     end_date = 2026,
+                                     lang = "en",
+                                     country = benchmarks)
+
+
+stunting <- wbstats::wb_data(indicator = "SH.STA.STNT.ME.ZS", country = "countries_only")
+stunt_progress_results <- suppressWarnings(track_progress(
+  data = stunting,
+  indicator = "SH.STA.STNT.ME.ZS",
+  code_col = "iso3c",
+  year_col = "date",
+  startyear_data = 2000,
+  endyear_data = 2024,
+  eval_from = 2015,
+  eval_to = 2023,
+  speed = TRUE,
+  percentiles = FALSE,
+  future =  FALSE,
+  target_year = 2030,
+  sequence_pctl = seq(20, 80, 20),
+  sequence_speed = c(0.25, 0.5, 1, 2, 4),
+  best = "low",
+  support = 1,
+  granularity = 0.01
+))
+```
+
+
+
+```{r Create Viz, echo=FALSE, message=FALSE, warning=FALSE}
+stunting_modeled_plot <- stunting_modeled |>
+  filter(date <= max(date[!is.na(SH.STA.STNT.ME.ZS)])) |>
+  mutate(label = if_else(date == max(date), as.character(country), NA_character_),
+         highlight = (iso3c == "TGO")) |>
+  ggplot(aes(x=date, y = SH.STA.STNT.ME.ZS, group = country, color = highlight)) +
+  theme_minimal() +
+  geom_line(linewidth = 0.75) +
+  labs(
+    title = "Prevalence of Stunting, (% of Population)",
+    x = "",
+    y = "",
+    color = "Country/Grouping") +
+    annotate("text",
+           x = 2021, 
+           y = 46,
+           label = "2024: Data ends",
+           fontface = "italic",
+           size = 3.5) +
+  geom_vline(xintercept = 2024, linetype = "dashed", color = "black") +
+  theme(
+    legend.position = "none") +
+  scale_color_manual(values = c("#8A969F", "#0071BC")) +
+  geom_label_repel(aes(label = label),
+                  nudge_x = 7.5,
+                  direction = "y",
+                  hjust = 0.5,
+                  segment.color = NA,
+                  na.rm = TRUE)
+  
+# ggsave("Visualizations/Modeled_Stunting.png")
+stunting_modeled_plot
+```
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+afw_stunting_modeled <- wbstats::wb_data(indicator = "SH.STA.STNT.ME.ZS",
+                                     start_date = 2000,
+                                     end_date = 2026,
+                                     lang = "en",
+                                     country = afw_codes)
+
+stunting_modeled_plot_afw <- afw_stunting_modeled |>
+  filter(date <= max(date[!is.na(SH.STA.STNT.ME.ZS)])) |>
+  mutate(label = if_else(date == max(date) & (iso3c == "TGO"), as.character(country), NA_character_),
+         highlight = (iso3c == "TGO")) |>
+  ggplot(aes(x=date, y = SH.STA.STNT.ME.ZS, group = country, color = highlight)) +
+  theme_minimal() +
+  geom_line(linewidth = 0.75) +
+  labs(
+    title = "Prevalence of Stunting, (% of Population)",
+    x = "",
+    y = "",
+    color = "Country/Grouping") +
+    annotate("text",
+           x = 2021, 
+           y = 61.5,
+           label = "2024: Data ends",
+           fontface = "italic",
+           size = 3.5) +
+  geom_vline(xintercept = 2024, linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("#8A969F", "#0071BC"),
+                     labels = c("TRUE" = "Somalia", "FALSE" = "AFW Countries"))
+  
+
+# ggsave("Visualizations/Modeled_Stunting.png")
+stunting_modeled_plot_afw
+```
+
+
+```{r, echo = FALSE, warning = FALSE}
+
+stunting_arrow <- afw_stunting_modeled |>
+  select(country, date, SH.STA.STNT.ME.ZS) |>
+  filter(date == 2024 | date == 2015) |>
+  mutate(SH.STA.STNT.ME.ZS = SH.STA.STNT.ME.ZS / 100) |>
+  pivot_wider(names_from = date, values_from = SH.STA.STNT.ME.ZS, names_prefix = "stunt_") |>
+  mutate(highlight = (country == "Togo"))
+
+stunting_arrow_plot1 <- stunting_arrow |>
+  ggplot() +
+  geom_segment(aes(x = reorder(country, -stunt_2024), xend = reorder(country, stunt_2024),
+                   y = stunt_2015, yend = stunt_2024, color = highlight),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed")) +
+  geom_point(aes(x = reorder(country, -stunt_2024), y = stunt_2015, color = highlight), size = 1) +
+  scale_color_manual(
+    values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+    labels = c("TRUE" = "Togo", "FALSE" = "AFW Countries"),
+    name = NULL
+  ) +
+  labs(x = "",
+       y = "",
+       title = "Prevalence of Stunting Change from 2015-2024",
+       subtitle = "% of Population, Sorted by End Year Value") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip() +
+  theme(legend.position = "none")
+stunting_arrow_plot1
+
+
+stunting_arrow_plot2 <- stunting_arrow |>
+  ggplot() +
+  geom_segment(aes(x = reorder(country, -stunt_2015), xend = reorder(country, stunt_2015),
+                   y = stunt_2015, yend = stunt_2024,
+                   color = highlight),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed")) +
+  geom_point(aes(x = reorder(country, -stunt_2015), y = stunt_2015, color = highlight), size = 1) +
+  scale_color_manual(
+    values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+    labels = c("TRUE" = "Togo", "FALSE" = "AFW Countries"),
+    name = NULL
+  ) +
+  labs(x = "",
+       y = "",
+       title = "Prevalence of Stunting Change from 2015-2024",
+       subtitle = "% of Population, Sorted by Start Year Value") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip() +
+  theme(legend.position = "none")
+stunting_arrow_plot2
+
+```
+
+
+
+
+
+---
+
+## Speed of Progress
+### Undernourishment
+```{r Getting Data, message = FALSE, echo = FALSE}
+data <- wbstats::wb_data(indicator = "SN.ITK.DEFC.ZS", lang = "en", country = "countries_only")
+progress_results <- suppressWarnings(track_progress(data = data,
+                                   indicator = "SN.ITK.DEFC.ZS",
+                                   code_col = "iso3c",
+                                   year_col = "date",
+                                   startyear_data = 2001,
+                                   endyear_data = 2023,
+                                   eval_from = 2015,
+                                   eval_to = 2023, 
+                                   speed = TRUE,
+                                   percentiles = FALSE,
+                                   future = FALSE, ## TRUE,
+                                   target_year = 2030,
+                                   sequence_pctl = seq(20,80,20),
+                                   sequence_speed = c(0.25, 0.5, 1, 2, 4),
+                                   best = "low",
+                                   support = 1,
+                                   granularity = 0.01))
+
+
+## Cleaning
+score_speed <- classifications |>
+  select(Economy, Code) |>
+  right_join(progress_results$scores$speed, by = c("Code" = "code")) |>
+  rename("country" = Economy, "code" = Code)
+
+score_speed_afw_separate <- score_speed |>
+  filter(code %in% afw_codes) |>
+  mutate(country = fct_reorder(country, score)) |>
+  mutate(issomalia = (code == "TGO"))
+```
+
+
+```{r Creating plot, echo = FALSE}
+fcs_pou_plot <- score_speed_afw_separate |>
+  ggplot(aes(x = country, y = score, fill = issomalia)) + geom_bar(stat="identity") +
+  theme_minimal() +
+  coord_flip() +
+  labs(
+    title = "Speed of Progress Measured from 2015-2023",
+    subtitle = "2026 FCV Countries",
+    y = "Speed of Progress",
+    x = ""
+  ) +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("#8A969F", "#0071BC")) +
+  theme(plot.subtitle = element_text(face = "italic"))
+fcs_pou_plot
+# ggsave("Visualizations/FCV_PoU.png", width = 7, height = 5)
+```
+
+
+### Stunting
+```{r Creating plot for stunt, echo = FALSE}
+fcs_stunt_plot <- stunt_progress_results$scores$speed |>
+  filter(code %in% afw_codes) |>
+  mutate(highlight = (code == "TGO")) |>
+  left_join(classifications, by = c("code" = "Code")) |>
+  mutate(Economy = fct_reorder(Economy, score)) |>
+  ggplot(aes(x = Economy, y = score, fill = highlight)) + 
+  theme_minimal() +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Speed of Progress from 2015-2023: Stunting",
+    subtitle = "2026 FCS Countries",
+    y = "Speed of Progress",
+    x = ""
+  ) +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("#8A969F", "#0071BC"))
+fcs_stunt_plot
+```
+
+
+---
+
+## Typical Path for Undernourishment and Stunting with Entire World
+### Undernourishment
+``` {r World Undernourishment, message = FALSE, echo = FALSE, warning = FALSE}
+
+## running on undernourishment track progress
+data <- wbstats::wb_data(indicator = "SN.ITK.DEFC.ZS", lang = "en", country = "countries_only")
+progress_results <- suppressWarnings(track_progress(data = data,
+                                   indicator = "SN.ITK.DEFC.ZS",
+                                   code_col = "iso3c",
+                                   year_col = "date",
+                                   startyear_data = 2001,
+                                   endyear_data = 2023,
+                                   eval_from = 2015,
+                                   eval_to = 2023, 
+                                   speed = TRUE,
+                                   percentiles = FALSE,
+                                   future = FALSE, ## TRUE,
+                                   target_year = 2030,
+                                   sequence_pctl = seq(20,80,20),
+                                   sequence_speed = c(0.25, 0.5, 1, 2, 4),
+                                   best = "low",
+                                   support = 1,
+                                   granularity = 0.01))
+
+check <- progress_results$scores$speed
+path_speed  <- progress_results$predicted_changes$path_speed
+
+## Combining and Plotting Somalia's path and the typical path
+pou_som <- pou |>
+  mutate(date = as.numeric(date)) |>
+  filter(iso3c == "TGO",
+         date >= 2015) |>
+  mutate(time = as.numeric(date) - 2015) |>
+  arrange(time)
+pou_som_yr_offset <- as.numeric(path_speed[which.min(abs(path_speed$y-pou_som$pou[1])), "time"])
+pou_som <- pou_som |>
+  mutate(time = time + pou_som_yr_offset, 
+         label = if_else(date == max(date) | date == min(date), as.character(date), NA_character_))
+
+combined_path_speed <- path_speed |>
+  mutate(country = "Typical Path") |>
+  rename("pou" = y) |>
+  full_join(pou_som, by = c("country", "time", "pou"))
+
+
+combined_path_speed_plot <- combined_path_speed |>
+  ggplot(aes(x = time, y = pou, color = country)) +
+  geom_line(linewidth = 0.9) +
+  theme_minimal() +
+  labs(
+    title = "Worldwide Typical Development Path",
+    subtitle = "Prevalence of Undernourishment, % of Population",
+    x = "Years of Progress",
+    y = "",
+    color = "") +
+  scale_color_manual(values = c("#0071BC", "#111111")) +
+  geom_line(data = combined_path_speed |> filter(country != "Typical Path"), linewidth = 1.25, color = "#0071BC") +
+  geom_label_repel(aes(label = label),
+                  nudge_x = 6,
+                  show.legend = FALSE)
+
+combined_path_speed_plot
+```
+
+
+```{r, echo = FALSE, warning = FALSE}
+## AFW Countries
+
+afw_pou <- pou |>
+  filter(date >= 2015 & !is.na(pou),
+         iso3c %in% afw_codes) |>
+  select(country, date, pou)
+
+offsets <- afw_pou |>
+  group_by(country) |>
+  slice_min(date, n = 1) |>  # first observation per country
+  ungroup() |>
+  rowwise() |>
+  mutate(yr_offset = as.numeric(path_speed[which.min(abs(path_speed$y - pou)), "time"])) |>
+  ungroup() |>
+  select(country, yr_offset)
+
+afw_pou <- afw_pou |>
+  left_join(offsets, by = "country") |>
+  mutate(time = (date - 2015) + yr_offset) |>
+  select(country, time, pou)
+
+afw_wld_pou <- path_speed |>
+  mutate(country = "Typical Path") |>
+  rename("pou" = y) |>
+  full_join(afw_pou, by = c("country", "time", "pou"))
+
+
+typical_path <- afw_wld_pou |> filter(country == "Typical Path")
+afw_countries <- afw_wld_pou |> filter(!country %in% c("Typical Path", "Togo"))
+togo <- afw_wld_pou |> filter(country == "Togo")
+
+fcs_wld_pou_plot <- ggplot() +
+  geom_line(data = typical_path, aes(x = time, y = pou), 
+            color = "#111111", linewidth = 0.9) +
+  geom_line(data = afw_countries, aes(x = time, y = pou, group = country), 
+            color = "#8A969F", linewidth = 0.5) +
+  geom_line(data = togo, aes(x = time, y = pou), 
+            color = "#0071BC", linewidth = 1.25) +
+  # dummy data for legend
+  geom_line(data = data.frame(time = NA, pou = NA, label = factor(c("Typical Path", "AFW Countries", "Togo"))),
+            aes(x = time, y = pou, color = label)) +
+  scale_color_manual(values = c("Typical Path" = "#111111", "AFW Countries" = "#8A969F", "Togo" = "#0071BC")) +
+  theme_minimal() +
+  labs(
+    title = "Togo is doing better than most other countries in West and Central Africa",
+    subtitle = "Typical Development Path for Prevalence of Undernourishment, as a % of Population",
+    x = "Years of Progress",
+    y = "",
+    color = "") +
+  theme(plot.subtitle = element_text(face = "italic"))
+fcs_wld_pou_plot
+# ggsave("Visualizations/FCV_SoP_PoU.png", width = 7, height = 5)
+
+```
+
+
+### Stunting
+``` {r World Stunting, message = FALSE, echo = FALSE, warning = FALSE}
+
+## running on stunting track progress
+data <- stunting
+progress_results <- suppressWarnings(track_progress(data = data,
+                                   indicator = "SH.STA.STNT.ME.ZS",
+                                   code_col = "iso3c",
+                                   year_col = "date",
+                                   startyear_data = 1960,
+                                   endyear_data = 2025,
+                                   eval_from = 2015,
+                                   eval_to = 2023, 
+                                   speed = TRUE,
+                                   percentiles = FALSE,
+                                   future = FALSE, ## TRUE,
+                                   target_year = 2030,
+                                   sequence_pctl = seq(20,80,20),
+                                   sequence_speed = c(0.25, 0.5, 1, 2, 4),
+                                   best = "low",
+                                   support = 1,
+                                   granularity = 0.01))
+
+
+check <- progress_results$scores$speed
+path_speed  <- progress_results$predicted_changes$path_speed
+
+## Combining and Plotting Somalia's path and the typical path
+path_speed  <- progress_results$predicted_changes$path_speed
+
+stunt_tgo <- stunting |>
+  filter(iso3c == "TGO", 
+         date >= 2015,
+         !is.na(SH.STA.STNT.ME.ZS)) |>
+  mutate(time = date - 2015) |>
+  arrange(time) |>
+  select(country, SH.STA.STNT.ME.ZS, time, date)
+
+stunt_som_yr_offset <- as.numeric(path_speed[which.min(abs(path_speed$y-stunt_tgo$SH.STA.STNT.ME.ZS[1])), "time"])
+
+stunt_tgo <- stunt_tgo |>
+  mutate(time = time + stunt_som_yr_offset,
+         label = if_else(date == max(date) | date == min(date), as.character(date), NA_character_))
+
+combined_path_speed <- path_speed |>
+  mutate(country = "Typical Path") |>
+  rename("SH.STA.STNT.ME.ZS" = y) |>
+  full_join(stunt_tgo, by = c("country", "time", "SH.STA.STNT.ME.ZS"))
+  
+combined_path_speed_plot <- combined_path_speed |>
+  ggplot(aes(x = time, y = SH.STA.STNT.ME.ZS, color = country)) +
+  geom_line(linewidth = 0.9) +
+  theme_minimal() +
+  labs(
+    title = "Worldwide Typical Development Path",
+    subtitle = "Prevalence of stunting, height for age (modeled estimate, % of children under 5)",
+    x = "Years of Progress",
+    y = "",
+    color = "") +
+  scale_color_manual(values = c("#0071BC", "#111111")) +
+  geom_line(data = combined_path_speed |> filter(country != "Typical Path"), linewidth = 1.25, color = "#0071BC") +
+  geom_label_repel(aes(label = label),
+                  nudge_x = 6,
+                  show.legend = FALSE)
+  
+combined_path_speed_plot
+```
+
+Somalia's 2015-2024 stunting rate progress on the global typical development path.
+
+```{r, echo = FALSE, warning = FALSE}
+## FCS Countries
+
+afw_stunt <- wbstats::wb_data(c( "stunt" = "SH.STA.STNT.ME.ZS"), country = afw_codes) |>
+  select(country, date, stunt) |>
+  filter(date >= 2015 & !is.na(stunt))
+
+offsets <- afw_stunt |>
+  group_by(country) |>
+  slice_min(date, n = 1) |>  # first observation per country
+  ungroup() |>
+  rowwise() |>
+  mutate(yr_offset = as.numeric(path_speed[which.min(abs(path_speed$y - stunt)), "time"])) |>
+  ungroup() |>
+  select(country, yr_offset)
+
+afw_stunt <- afw_stunt |>
+  left_join(offsets, by = "country") |>
+  mutate(time = (date - 2015) + yr_offset) |>
+  select(country, time, stunt)
+
+afw_wld_stunt <- path_speed |>
+  mutate(country = "Typical Path") |>
+  rename("stunt" = y) |>
+  full_join(afw_stunt, by = c("country", "time", "stunt"))
+
+
+typical_path <- afw_wld_stunt |> filter(country == "Typical Path")
+afw_countries <- afw_wld_stunt |> filter(!country %in% c("Typical Path", "Togo"))
+togo <- afw_wld_stunt |> filter(country == "Togo")
+
+afw_wld_stunt_plot <- ggplot() +
+  geom_line(data = typical_path, aes(x = time, y = stunt), 
+            color = "#111111", linewidth = 0.9) +
+  geom_line(data = afw_countries, aes(x = time, y = stunt, group = country), 
+            color = "#8A969F", linewidth = 0.5) +
+  geom_line(data = togo, aes(x = time, y = stunt), 
+            color = "#0071BC", linewidth = 1.25) +
+  # dummy data for legend
+  geom_line(data = data.frame(time = NA, stunt = NA, label = factor(c("Typical Path", "AFW Countries", "Togo"))),
+            aes(x = time, y = stunt, color = label)) +
+  scale_color_manual(values = c("Typical Path" = "#111111", "AFW Countries" = "#8A969F", "Togo" = "#0071BC")) +
+  theme_minimal() +
+  labs(
+    title = "AFW Country Development Paths 2015-2023",
+    subtitle = "Prevalence of Undernourishment, % of Population",
+    x = "Years of Progress",
+    y = "",
+    color = ""
+  )
+afw_wld_stunt_plot
+
+```
+
+
+
