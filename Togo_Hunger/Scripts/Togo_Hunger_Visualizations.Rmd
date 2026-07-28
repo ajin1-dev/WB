@@ -78,7 +78,7 @@ pou_plot <- pou |>
                   direction = "y",
                   hjust = 0.5,
                   segment.color = NA,
-                  na.rm = TRUE)  +
+                  na.rm = TRUE) +
   theme(plot.subtitle = element_text(face = "italic"))
 # ggsave("Visualizations/Pct_Undernourishment.png")
 pou_plot
@@ -806,6 +806,342 @@ afw_wld_stunt_plot <- ggplot() +
 afw_wld_stunt_plot
 
 ```
+
+
+
+## FAOSTAT Indicators
+```{r}
+
+## Cleaning FAOSTAT Dataset
+faostat_meta <- read.csv(file.path(input_dir, "FAOSTAT_iso3c_conversion_sheet.csv")) |>
+  select(Area.Code..ISO3., Area) |>
+  unique()
+
+faostat_pre1 <- read.csv(file.path(input_dir, "Production_Crops_Livestock_E_Africa.csv"))
+faostat_pre2 <- read.csv(file.path(input_dir, "Production_Crops_Livestock_E_All_Area_Groups.csv"))
+
+faostat <- faostat_pre1 |>
+  bind_rows(faostat_pre2) |>
+  filter(Area %in% faostat_meta$Area) |>
+  left_join(faostat_meta, by = "Area") |>
+  select(-c(Area.Code, Area.Code..M49., Item.Code..CPC., Element.Code),
+         -ends_with("F"),
+         -ends_with("N")) |>
+  rename_with(~ gsub("^Y", "", .x), starts_with("Y")) |>
+  rename("iso3c" = Area.Code..ISO3.) |>
+  pivot_longer(cols = "1961":"2024",
+               names_to = "date",
+               values_to = "value") |>
+  mutate(date = as.numeric(date)) |>
+  mutate(highlight = (Area == "Togo"))
+
+
+
+## Creating viz for cereal yield and growth
+faostat_cereal_yield <- faostat |>
+  filter(iso3c %in% afw_codes,
+         Item.Code == "1717",
+         Element == "Yield",
+         date >= 2000)
+
+faostat_cereal_yield_plot <- faostat_cereal_yield |>
+  ggplot(aes(x = date, y = value, group = Area, color = highlight)) +
+  geom_line() +
+  theme_minimal() +
+  scale_color_manual(values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+                     labels = c("TRUE" = "Togo", "FALSE" = "Africa West and Central")) +
+  labs(
+    title = "Cereal Yield, kg/ha",
+    x = "",
+    y = "",
+    color = "") +
+  scale_x_continuous(breaks = seq(min(faostat$date), max(faostat$date), by = 5))
+faostat_cereal_yield_plot
+
+
+faostat_cereal_yield_growth_plot <- faostat_cereal_yield |>
+  group_by(Area) |>
+  summarize(
+    start_year = min(date),
+    end_year = max(date),
+    start_value = value[which.min(date)],
+    end_value = value[which.max(date)],
+    diff = end_value - start_value,
+    pct_change = (end_value - start_value) / start_value * 100,
+    highlight = first(highlight),
+    .groups = "drop") |>
+  mutate(Area = fct_reorder(Area, pct_change)) |>
+  ggplot(aes(x = Area, y = pct_change, fill = highlight)) +
+  geom_col() +
+  theme_minimal() +
+  coord_flip() +
+  scale_fill_manual(values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+                     labels = c("TRUE" = "Togo", "FALSE" = "Africa West and Central")) +
+  labs(
+    title = "Cereal Yield Growth from 2000-2024, percent",
+    x = "",
+    y = "",
+    color = "") +
+  theme(legend.position = "none")
+faostat_cereal_yield_growth_plot
+
+
+## Creating viz for cereal production
+faostat_cereal_prod <- faostat |>
+  filter(iso3c %in% afw_codes,
+         Item.Code == "1717",
+         Element == "Production",
+         date >= 2000)
+
+faostat_cereal_prod_plot <- faostat_cereal_prod |>
+  ggplot(aes(x = date, y = value, group = Area, color = highlight)) +
+  geom_line() +
+  theme_minimal() +
+  scale_color_manual(values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+                     labels = c("TRUE" = "Togo", "FALSE" = "Africa West and Central")) +
+  labs(
+    title = "Cereal Production, tonnes",
+    x = "",
+    y = "",
+    color = "") +
+  scale_x_continuous(breaks = seq(min(faostat$date), max(faostat$date), by = 5))
+faostat_cereal_prod_plot
+
+
+faostat_cereal_prod_growth_plot <- faostat_cereal_prod |>
+  group_by(Area) |>
+  summarize(
+    start_year = min(date),
+    end_year = max(date),
+    start_value = value[which.min(date)],
+    end_value = value[which.max(date)],
+    diff = end_value - start_value,
+    pct_change = (end_value - start_value) / start_value * 100,
+    highlight = first(highlight),
+    .groups = "drop") |>
+  mutate(Area = fct_reorder(Area, pct_change)) |>
+  ggplot(aes(x = Area, y = pct_change, fill = highlight)) +
+  geom_col() +
+  theme_minimal() +
+  coord_flip() +
+  scale_fill_manual(values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+                     labels = c("TRUE" = "Togo", "FALSE" = "Africa West and Central")) +
+  labs(
+    title = "Cereal Production Growth from 2000-2024, percent",
+    x = "",
+    y = "",
+    color = "") +
+  theme(legend.position = "none")
+faostat_cereal_prod_growth_plot
+
+
+## Creating viz for cereal production per capita
+faostat_cereal_prod_pc <- faostat |>
+  filter(iso3c %in% afw_codes,
+         Item.Code == "1717",
+         Element == "Production",
+         date >= 2000) |>
+  left_join(country_pops, by = c("iso3c", "date")) |>
+  mutate(prod_pc = (value/population) * 1000,
+         Unit = "kg")
+
+faostat_cereal_prod_pc_plot <- faostat_cereal_prod_pc |>
+  ggplot(aes(x = date, y = prod_pc, group = Area, color = highlight)) +
+  geom_line() +
+  theme_minimal() +
+  scale_color_manual(values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+                     labels = c("TRUE" = "Togo", "FALSE" = "Africa West and Central")) +
+  labs(
+    title = "Cereal Production per capita, kg",
+    x = "",
+    y = "",
+    color = "") +
+  scale_x_continuous(breaks = seq(min(faostat$date), max(faostat$date), by = 5))
+faostat_cereal_prod_pc_plot
+
+faostat_cereal_prod_pc_growth_plot <- faostat_cereal_prod_pc |>
+  group_by(Area) |>
+  summarize(
+    start_year = min(date),
+    end_year = max(date),
+    start_value = value[which.min(date)],
+    end_value = value[which.max(date)],
+    diff = end_value - start_value,
+    pct_change = (end_value - start_value) / start_value * 100,
+    highlight = first(highlight),
+    .groups = "drop") |>
+  mutate(Area = fct_reorder(Area, pct_change)) |>
+  ggplot(aes(x = Area, y = pct_change, fill = highlight)) +
+  geom_col() +
+  theme_minimal() +
+  coord_flip() +
+  scale_fill_manual(values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+                     labels = c("TRUE" = "Togo", "FALSE" = "Africa West and Central")) +
+  labs(
+    title = "Cereal Production per Capita Growth from 2000-2024, percent",
+    x = "",
+    y = "",
+    color = "") +
+  theme(legend.position = "none")
+faostat_cereal_prod_pc_growth_plot
+
+
+
+
+## Creating viz for cereal area harvested
+faostat_cereal_area <- faostat |>
+  filter(iso3c %in% afw_codes,
+         Item.Code == "1717",
+         Element == "Area harvested",
+         date >= 2000) 
+
+faostat_cereal_area_plot <- faostat_cereal_area |>
+  ggplot(aes(x = date, y = value, group = Area, color = highlight)) +
+  geom_line() +
+  theme_minimal() +
+  scale_color_manual(values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+                     labels = c("TRUE" = "Togo", "FALSE" = "Africa West and Central")) +
+  labs(
+    title = "Cereal Area Harvested, Hectacre",
+    x = "",
+    y = "",
+    color = "") +
+  scale_x_continuous(breaks = seq(min(faostat$date), max(faostat$date), by = 5))
+faostat_cereal_area_plot
+
+faostat_cereal_area_growth_plot <- faostat_cereal_area |>
+  group_by(Area) |>
+  summarize(
+    start_year = min(date),
+    end_year = max(date),
+    start_value = value[which.min(date)],
+    end_value = value[which.max(date)],
+    diff = end_value - start_value,
+    pct_change = (end_value - start_value) / start_value * 100,
+    highlight = first(highlight),
+    .groups = "drop") |>
+  mutate(Area = fct_reorder(Area, pct_change)) |>
+  ggplot(aes(x = Area, y = pct_change, fill = highlight)) +
+  geom_col() +
+  theme_minimal() +
+  coord_flip() +
+  scale_fill_manual(values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+                     labels = c("TRUE" = "Togo", "FALSE" = "Africa West and Central")) +
+  labs(
+    title = "Cereal Area Harvested Growth from 2000-2024, percent",
+    x = "",
+    y = "",
+    color = "") +
+  theme(legend.position = "none")
+faostat_cereal_area_growth_plot
+```
+
+
+``` {r}
+## Loading in FAOSTAT Food Security Indicators
+faostat_food_import <- read.csv(file.path(input_dir, "FAOSTAT_food_import_pct_aggregates.csv")) |>
+  select(Area.Code..ISO3., Area, Item, Year, Value) |>
+  mutate(year_start = as.numeric(str_extract(Year, "^\\d{4}")),
+         label = if_else(Year == max(Year), as.character(Area), NA_character_),
+         highlight = (Area.Code..ISO3. == "TGO")) |>
+  ggplot(aes(x = year_start, y = Value, group = Area, color = highlight)) +
+  geom_line() +
+  theme_minimal() +
+  scale_color_manual(values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+                     labels = c("TRUE" = "Togo", "FALSE" = "Africa West and Central")) +
+  labs(
+    title = "Value of food imports in total merchandise exports (percent)",
+    x = "",
+    y = "",
+    color = "") +
+  geom_label_repel(aes(label = label),
+                   nudge_x = 0.5,
+                   direction = "y",
+                   hjust = 0.5,
+                   segment.color = NA,
+                   na.rm = TRUE) +
+  theme(legend.position = "none")
+
+faostat_food_import
+
+
+faostat_prod_indicies_pre1 <- read.csv(file.path(input_dir, "Production_Indices_E_Africa.csv")) |>
+  left_join(faostat_meta, by = "Area") |>
+  filter(Area.Code..ISO3. %in% afw_codes)
+faostat_prod_indicies_pre2 <- read.csv(file.path(input_dir, "Production_Indices_E_All_Area_Groups.csv")) |>
+  filter(Area %in% c("World", "Africa", "Western Africa")) |>
+  mutate(aggregate = TRUE)
+
+faostat_prod_indicies <- faostat_prod_indicies_pre1 |>
+  bind_rows(faostat_prod_indicies_pre2) |>
+  select(-c(Area.Code, Area.Code..M49., Area.Code..ISO3., Item.Code..CPC.),
+         -ends_with("F"),
+         -ends_with("N")) |>
+  rename_with(~ gsub("^Y", "", .x), starts_with("Y")) |>
+  pivot_longer(cols = "1961":"2024",
+               names_to = "date",
+               values_to = "value") |>
+  mutate(date = as.numeric(date)) |>
+  mutate(highlight = (Area == "Togo"))
+
+
+agri_index_aggs_plot <- faostat_prod_indicies |>
+  filter(Item == "Agriculture",
+         aggregate == TRUE | highlight == TRUE,
+         Element.Code == "432",
+         date >= 2000) |>
+  mutate(label = if_else(date == max(date), as.character(Area), NA_character_)) |>
+  ggplot(aes(x = date, y = value, group = Area, color = highlight)) +
+  geom_line() +
+  theme_minimal() +
+  scale_color_manual(values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+                     labels = c("TRUE" = "Togo", "FALSE" = "Africa West and Central")) +
+  labs(
+    title = "Gross Production Index Number (2014-2016 = 100)",
+    x = "",
+    y = "",
+    color = "") +
+  geom_label_repel(aes(label = label),
+                   nudge_x = 0.5,
+                   direction = "y",
+                   hjust = 0.5,
+                   segment.color = NA,
+                   na.rm = TRUE) +
+  theme(legend.position = "none") +
+  scale_x_continuous(breaks = seq(2000, max(faostat_prod_indicies$date), by = 5))
+agri_index_aggs_plot
+
+
+ 
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
