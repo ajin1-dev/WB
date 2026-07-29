@@ -1,0 +1,1252 @@
+---
+title: "Somalia Hunger Visualizations"
+output: html_document
+---
+```{r setup, echo = FALSE, message = FALSE}
+knitr::opts_knit$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(trackr)
+library(ggrepel)
+```
+
+
+```{r benchmarks, echo = FALSE}
+benchmarks = c("SOM", "SSF", "LIC", "WLD", "FCS")
+classifications <- read_excel("Data/country_classifications.xlsx")
+low_inc_codes <- classifications |>
+  filter(`Income group` == "Low income") |>
+  pull(Code)
+ssa_codes <- classifications |>
+  filter(Region == "Sub-Saharan Africa") |>
+  pull(Code)
+fcs_codes <- classifications |>
+  filter(Economy %in% c("Afghanistan",
+                        "Burkina Faso",
+                        "Cameroon",
+                        "Central African Republic",
+                        "Congo, Dem. Rep.",
+                        "Ethiopia",
+                        "Haiti",
+                        "Iraq",
+                        "Lebanon",
+                        "Mali",
+                        "Mozambique",
+                        "Myanmar",
+                        "Niger",
+                        "Nigeria",
+                        "Somalia, Fed. Rep.",
+                        "South Sudan",
+                        "Sudan",
+                        "Syrian Arab Republic",
+                        "Ukraine",
+                        "West Bank and Gaza",
+                        "Yemen, Rep.",
+                        "Burundi",
+                        "Chad",
+                        "Comoros",
+                        "Congo, Rep.",
+                        "Eritrea",
+                        "Guinea-Bissau",
+                        "Kiribati",
+                        "Libya",
+                        "Marshall Islands",
+                        "Micronesia, Fed. Sts.",
+                        "Papua New Guinea",
+                        "São Tomé and Príncipe",
+                        "Solomon Islands",
+                        "Timor-Leste",
+                        "Tuvalu",
+                        "Venezuela, RB",
+                        "Zimbabwe"
+                        )) |>
+  pull(Code)
+country_pops <- wbstats::wb_data(indicator = "SP.POP.TOTL", lang = "en", country = "countries_only") |>
+  select(iso3c, SP.POP.TOTL, date) |>
+  rename("code" = iso3c, "population" = SP.POP.TOTL, "year" = date)
+```
+
+---
+
+## Prevalence of Undernourishment
+
+```{r, echo = FALSE}
+## Prevalence of undernourishment (% of population); ind = SN.ITK.DEFC.ZS
+pou <- read.csv("Data/API_SN.ITK.DEFC.ZS_DS2_en_csv_v2_331187.csv", skip = 4) |>
+  select(c(Country.Name, Country.Code, "X2001":last_col(offset = 3)))
+colnames(pou) <- gsub("X", "", colnames(pou))
+pou <- pou |>
+  pivot_longer(cols = "2001":last_col(),
+               names_to = "year",
+               values_to = "value")
+```
+
+
+
+```{r, echo = FALSE, warning = FALSE}
+pou_plot <- pou |>
+  filter(Country.Code %in% benchmarks) |>
+  mutate(label = if_else(year == max(year), as.character(Country.Name), NA_character_),
+         highlight = (Country.Code == "SOM")) |>
+  ggplot(aes(x = year, y = value, group = Country.Name, color = highlight)) +
+  theme_minimal() +
+  geom_line() +
+  scale_x_discrete(breaks = seq(2001, 2023, by = 5)) +
+  theme(
+    legend.position = "none") +
+  labs(title = "Somalia has Historically been the Most Undernourished Nation in the World",
+       subtitle = "Prevalence of Undernourishment, % of Population",
+       x = "",
+       y = "") +
+  scale_color_manual(values = c("#8A969F", "#0071BC")) +
+  geom_vline(xintercept = 23, linetype = "dashed", color = "black") +
+  annotate("text",
+           x = 20.25, 
+           y = 68,
+           label = "2023: Data ends",
+           fontface = "italic",
+           size = 3.5) + 
+  geom_label_repel(aes(label = label),
+                  nudge_x = 7.5,
+                  direction = "y",
+                  hjust = 0.5,
+                  segment.color = NA,
+                  na.rm = TRUE)  +
+  theme(plot.subtitle = element_text(face = "italic"))
+# ggsave("Visualizations/Pct_Undernourishment.png")
+pou_plot
+```
+
+Somalia's undernourishment rate compared to global and regional averages, 2001–2023. During this time period, it has consistently been the country with the highest level of undernourishment.
+
+```{r, echo = FALSE, warning = FALSE}
+## Line chart with FCS Countries
+
+pou_fcs_plot <- pou |>
+  filter(Country.Code %in% fcs_codes) |>
+  mutate(label = if_else(year == max(year) & Country.Code == "SOM", as.character(Country.Name), NA_character_),
+         highlight = (Country.Code == "SOM")) |>
+  ggplot(aes(x = year, y = value, group = Country.Name, color = highlight)) +
+  theme_minimal() +
+  geom_line() +
+  scale_x_discrete(breaks = seq(2001, 2023, by = 5)) +
+  labs(title = "Prevalence of Undernourishment, % of Population",
+       x = "",
+       y = "",
+       color = "Country") +
+  scale_color_manual(values = c("FALSE" = "#8A969F", "TRUE" = "#0071BC"),
+                     labels = c("FALSE" = "FCS Countries", "TRUE" = "Somalia")) + 
+  geom_vline(xintercept = 23, linetype = "dashed", color = "black") +
+  annotate("text",
+           x = 20.25, 
+           y = 68,
+           label = "2023: Data ends",
+           fontface = "italic",
+           size = 3.5)
+
+pou_fcs_plot
+```
+
+Somalia's undernourishment rate plotted against individual fragile and conflict-affected states, 2001–2023.
+
+
+```{r, echo = FALSE, warning = FALSE}
+pou_arrow <- pou |>
+  filter(Country.Code %in% fcs_codes) |>
+  rename("country" = Country.Name, "date" = year) |>
+  filter(date == 2023 | date == 2015) |>
+  mutate(value = value / 100) |>
+  pivot_wider(names_from = date, values_from = value, names_prefix = "pou_") |>
+  filter(!is.na(pou_2015) | !is.na(pou_2023)) |>
+  mutate(highlight = (country == "Somalia, Fed. Rep."))
+
+pou_arrow_plot1 <- pou_arrow |>
+  ggplot() +
+  geom_segment(aes(x = reorder(country, -pou_2023), xend = reorder(country, pou_2023),
+                   y = pou_2015, yend = pou_2023, color = highlight),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed")) +
+  geom_point(aes(x = reorder(country, -pou_2023), y = pou_2015, color = highlight), size = 1) +
+  scale_color_manual(
+    values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+    labels = c("TRUE" = "Somalia", "FALSE" = "FCS Countries"),
+    name = NULL
+  ) +
+  labs(x = "",
+       y = "",
+       title = "Prevalence of Undernourishment Change from 2015-2023",
+       subtitle = "% of Population, Sorted by End Year Value") +
+  theme_minimal() +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent)
+pou_arrow_plot1
+```
+
+
+
+
+```{r, echo = FALSE, warning = FALSE}
+pou_arrow_plot2 <- pou_arrow |>
+  ggplot() +
+  geom_segment(aes(x = reorder(country, -pou_2015), xend = reorder(country, pou_2015),
+                   y = pou_2015, yend = pou_2023,
+                   color = highlight),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed")) +
+  geom_point(aes(x = reorder(country, -pou_2015), y = pou_2015, color = highlight), size = 1) +
+  scale_color_manual(
+    values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+    labels = c("TRUE" = "Somalia", "FALSE" = "FCS Countries"),
+    name = NULL
+  ) +
+  labs(x = "",
+       y = "",
+       title = "Prevalence of Undernourishment Change from 2015-2023",
+       subtitle = "% of Population, Sorted by Start Year Value") +
+  theme_minimal() +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent)
+pou_arrow_plot2
+
+```
+
+Change in undernourishment prevalence across FCS countries from 2015 to 2023, ranked by 2023 rate and by 2015 rate. Although Somalia has improved a great deal in recent years, it still lags the rest of the world.
+
+---
+
+## FIES Data
+
+```{r, echo = FALSE}
+## Prevalence of moderate or severe food insecurity in the population (%); ind = SN.ITK.MSFI.ZS
+insecurity_ms<- read.csv("Data/API_SN.ITK.MSFI.ZS_DS2_en_csv_v2_7955.csv", skip = 4) |>
+  select(c(Country.Name, Country.Code, "X2021")) |>
+  rename(pct = X2021)
+
+## Creating Makeshift Benchmarks
+### world average
+wld_avg_ms <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_ms, by = c("code" = "Country.Code")) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "World", Country.Code = "WLD")
+### ssa average
+ssa_avg_ms <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_ms, by = c("code" = "Country.Code")) |>
+  filter(code %in% ssa_codes) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "Sub-Saharan Africa", Country.Code = "SSF")
+### low income average
+lic_avg_ms <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_ms, by = c("code" = "Country.Code")) |>
+  filter(code %in% low_inc_codes) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "Low income", Country.Code = "LIC")
+### fcs average
+fcs_avg_ms <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_ms, by = c("code" = "Country.Code")) |>
+  filter(code %in% fcs_codes) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "FCS Countries", Country.Code = "FCS")
+### Joining to main dataset and filtering
+insecurity_ms <- insecurity_ms |>
+  filter(Country.Code == "SOM") |>
+  bind_rows( wld_avg_ms, ssa_avg_ms, lic_avg_ms, fcs_avg_ms)
+  
+
+
+## Prevalence of severe food insecurity in the population (%); ind = SN.ITK.SVFI.ZS
+insecurity_s <- read.csv("Data/API_SN.ITK.SVFI.ZS_DS2_en_csv_v2_331188.csv", skip = 4) |>
+  select(c(Country.Name, Country.Code, "X2021")) |>
+  rename(pct = X2021)
+
+## Creating Makeshift Benchmarks
+### world average
+wld_avg_s <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_s, by = c("code" = "Country.Code")) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "World", Country.Code = "WLD")
+### ssa average
+ssa_avg_s <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_s, by = c("code" = "Country.Code")) |>
+  filter(code %in% ssa_codes) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "Sub-Saharan Africa", Country.Code = "SSF")
+### low income average
+lic_avg_s <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_s, by = c("code" = "Country.Code")) |>
+  filter(code %in% low_inc_codes) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "Low income", Country.Code = "LIC")
+### fcs average
+fcs_avg_s <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_s, by = c("code" = "Country.Code")) |>
+  filter(code %in% fcs_codes) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "FCS Countries", Country.Code = "FCS")
+### Joining to main dataset and filtering
+insecurity_s <- insecurity_s |>
+  filter(Country.Code == "SOM") |>
+  bind_rows( wld_avg_s, ssa_avg_s, lic_avg_s, fcs_avg_s)
+```
+
+
+```{r, echo = FALSE}
+modsev_plot <- insecurity_ms |>
+  mutate(pct = pct/100,
+         issomalia = !is.na(Country.Code) & Country.Code == "SOM",
+         Country.Name = fct_reorder(Country.Name, -(pct))) |>
+  ggplot(aes(x = Country.Name, y = pct, fill = issomalia)) +
+  geom_col() +
+  theme_minimal() +
+  labs(
+    title = "2021: Prevalence of Moderate or Severe Food Insecurity, % of Population",
+    x = "",
+    y = "",
+    fill = "Country/Grouping") + 
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = c("#8A969F", "#0071BC")) +
+  theme(legend.position = "none")
+# ggsave("Visualizations/Mod_Sev_Insecurity.png")
+# modsev_plot
+
+sev_plot <- insecurity_s |>
+  mutate(pct = pct/100,
+         issomalia = !is.na(Country.Code) & Country.Code == "SOM",
+         Country.Name = fct_reorder(Country.Name, -(pct))) |>
+  ggplot(aes(x = Country.Name, y = pct, fill = issomalia)) +
+  theme_minimal() +
+  geom_col() +
+  labs(
+    title = "2021: Prevalence of Severe Food Insecurity, % of Population",
+    x = "",
+    y = "",
+    fill = "Country/Grouping") + 
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = c("#8A969F", "#0071BC")) +
+  theme(legend.position = "none")
+
+# ggsave("Visualizations/Sev_Insecurity.png")
+# sev_plot
+
+## Stacked Bar Charts
+combined_fies <- insecurity_ms |>
+  rename("Moderate Only" = pct) |>
+  full_join(insecurity_s, by = c("Country.Name", "Country.Code")) |>
+  rename("Severe" = pct) |>
+  mutate("Moderate Only" = (`Moderate Only` - Severe) / 100,
+         "Severe" = Severe / 100) |>
+  pivot_longer(cols = 3:4,
+               names_to = "level",
+               values_to = "value") |>
+  mutate(Country.Name = fct_reorder(Country.Name, -(value)))
+```
+
+
+
+```{r, echo = FALSE, warning = FALSE}
+combined_fies_plot_grouped <- insecurity_ms |>
+  rename("Moderate and Severe" = pct) |>
+  full_join(insecurity_s, by = c("Country.Name", "Country.Code")) |>
+  rename("Severe" = pct) |>
+  pivot_longer(cols = 3:4,
+               names_to = "level",
+               values_to = "value") |>
+  mutate(value = value / 100,
+         Country.Name = fct_reorder(Country.Name, -(value))) |>
+  ggplot(aes(x = Country.Name, y = value, fill = level)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal() +
+  labs(
+    title = "2021: Prevalence of Moderate and Severe Food Insecurity, % of Population",
+    x = "",
+    y = "",
+    fill = "Insecurity Level") + 
+  scale_fill_manual(values = c(
+  "Moderate and Severe" = "#f89d7b",
+  "Severe" = "#bb301e"))
+combined_fies_plot_grouped
+```
+
+Prevalence of moderate-and-severe and severe food insecurity in Somalia compared to peer country groups, 2021.
+
+```{r, echo = FALSE, warning = FALSE}
+
+combined_fies_plot_stacked <- combined_fies |>
+  ggplot(aes(x = Country.Name, y = value, fill = level)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal() +
+  labs(
+    title = "2021: Prevalence of Moderate and Severe Food Insecurity, % of Population",
+    x = "",
+    y = "",
+    fill = "Insecurity Level") + 
+  scale_fill_manual(values = c(
+  "Moderate Only" = "#e56245",
+  "Severe" = "#bb301e"))
+combined_fies_plot_stacked
+
+# '#ffd6b9', '#fdb999', '#f89d7b', '#ef805f', '#e56245', '#d24830', '#bb301e', '#a2180f', '#870000'
+## Grouped Bar Charts
+```
+
+The same data shown as stacked bars, separating the severe and moderate-only components of food insecurity.
+
+
+```{r, warning = FALSE, echo = FALSE}
+# FCS Comparison charts
+
+fcs_insecurity <- wbstats::wb_data(c("mod_sev" = "SN.ITK.MSFI.ZS", "sev" = "SN.ITK.SVFI.ZS"), country = "countries_only") |>
+  filter(iso3c %in% fcs_codes) |>
+  filter(!is.na(mod_sev)) |>
+  group_by(country) |>
+  filter(date == 2021) |>
+  ungroup() |>
+  mutate(highlight = (iso3c == "SOM"))
+  
+fcs_ms_plot <- fcs_insecurity |>
+  mutate(country = fct_reorder(country, -mod_sev),
+         mod_sev = mod_sev / 100) |>
+  ggplot(aes(x = country, y = mod_sev, fill = highlight)) + geom_bar(stat = "identity") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip() +
+  labs(
+    title = "2021: Prevalence of Moderate and Severe Food Insecurity",
+    subtitle = "% of Population, 2026 FCS Countries",
+    y = "",
+    x = ""
+  ) +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("#8A969F", "#0071BC"))
+fcs_ms_plot
+```
+
+Combined moderate and severe food insecurity rates across all 2026 FCS countries, 2021. Somalia ranks among the highest.
+
+```{r, echo = FALSE, warning = FALSE}
+fcs_s_plot <- fcs_insecurity |>
+  filter(!is.na(sev)) |>
+  mutate(country = fct_reorder(country, -sev),
+         sev = sev / 100) |>
+  ggplot(aes(x = country, y = sev, fill = highlight)) + geom_bar(stat = "identity") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip() +
+  labs(
+    title = "2021: Prevalence of Severe Food Insecurity",
+    subtitle = "% of Population, 2026 FCS Countries",
+    y = "",
+    x = ""
+  ) +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("#8A969F", "#0071BC"))
+fcs_s_plot
+```
+
+Severe food insecurity rates across FCS countries, 2021. Somalia falls in the worst tier alongside Haiti and DRC.
+
+
+---
+
+## IPC data
+
+```{r  Loading in and Cleaning Data, echo = FALSE}
+ipc0 <- read_excel("Data/IPC_Population_Analysis_Styled_2017,2027_1781118839874.xlsx") |>
+  select(1:"Current - Phase 3+ %") |>
+  filter(!is.na(`Country Population`) & !is.na(`Current - Analysis Period`)) |>
+  filter(`Country/Analysis Name/Group Name` != "SO: Acute Food Insecurity Analysis January 2026")
+ipc1 <- read_excel("Data/IPC_Population_Analysis_Styled_2017,2027_1781119874050.xlsx") |>
+  select(1:"Current - Phase 3+ %") |>
+  filter(!is.na(`Country Population`))
+ipc <- bind_rows(ipc0, ipc1)
+ipc <- ipc |> 
+  rename(population = `Country Population`, date = `Date of Analysis`) |>
+  mutate(date = ymd_hms(date))
+
+## Data with population
+ipc_pop <- ipc |>
+  select(population, date, ends_with("Pop")) |>
+  rename_with(~gsub("Current - ", "", .x)) |>
+  rename_with(~gsub(" Pop", "", .x))
+ipc_pop <- ipc_pop |>
+  pivot_longer(cols = `Phase 1`:`Phase 3+`,
+               names_to = "phase",
+               values_to = "pop") |>
+  mutate(pop_scaled = pop/1000000)
+
+## Data with percents
+ipc_pct <- ipc |>
+  select(population, date, ends_with("%")) |>
+  rename_with(~gsub("Current - ", "", .x)) |>
+  rename_with(~gsub(" %", "", .x))
+ipc_pct <- ipc_pct |>
+  pivot_longer(cols = `Phase 1`:`Phase 3+`,
+               names_to = "phase",
+               values_to = "pct")
+```
+
+
+
+```{r IPC Visualizations, echo = FALSE}
+ipc_pop_plot <- ipc_pop |> filter(phase != "Phase 3+") |>
+  ggplot(aes(x = date, y = pop_scaled, fill = phase)) +
+  theme_minimal() +
+  geom_area() +
+  labs(
+    title = "IPC Food Insecurity Classifications, by Population (Millions)",
+    subtitle = "Somalia 2017-2026",
+    x = "",
+    y = "",
+    fill = "") +
+  scale_fill_manual(values = c('#e3f6fd', '#b6d4f1', '#8b6486', '#7f3f4d', '#691b15'))
+# ggsave("Visualizations/IPC_Phases_Pop.png")
+ipc_pop_plot
+```
+
+Population in each IPC food insecurity phase in Somalia, 2017–2026, measured in millions of people.
+
+```{r, echo = FALSE, warning = FALSE}
+
+ipc_pct_plot <- ipc_pct |> filter(phase != "Phase 3+") |>
+  ggplot(aes(x = date, y = pct, fill = phase)) +
+  theme_minimal() +
+    geom_area() +
+  labs(
+    title = "More Recently, Food Security has been Worsening in Somalia",
+    subtitle = "IPC Food Insecurity Classifications from 2017-2026, % of Population",
+    x = "",
+    y = "",
+    fill = "") +
+  theme(plot.subtitle = element_text(face = "italic")) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = c('#e3f6fd', '#b6d4f1', '#8b6486', '#7f3f4d', '#691b15'))
+# ggsave("Visualizations/IPC_Phases_Pct.png", width = 7, height = 5)
+ipc_pct_plot
+
+
+# ipc_p3_plot <- ipc_pct |> filter(phase == "Phase 3+") |>
+#   ggplot(aes(x = date, y = pct)) + geom_line() +
+#   labs(
+#     title = ""
+#   )
+```
+
+The same IPC phase breakdown expressed as a share of Somalia's total assessed population.
+
+
+```{r, echo = FALSE, warning = FALSE}
+ipc_dashboard <- read.csv("Data/IPC_CH_numbers_by_country_29-6-2026.csv", skip = 1) |>
+  filter(Coverage != "") |>
+  select(-c(Period.from, Period.to, IPC.CH)) |>
+  pivot_longer(cols=Phase.1:Phase.5,
+               names_to = "Phase",
+               values_to = "value") |>
+  mutate(highlight = (Country == "Somalia")) |>
+  filter(Phase != "Phase.3.") |> 
+  mutate(Country = case_when(
+    Country == "Democratic Republic of the Congo" ~ "Congo DR",
+    Country == "United Republic of Tanzania" ~ "Tanzania",
+    TRUE ~ Country)) |>
+  mutate(Country = fct_reorder(Country, Phase.3.), 
+         Country = fct_reorder(Country, highlight))
+
+ipc_dashboard_plot <- ipc_dashboard |>
+  mutate(value = value / 100) |>
+  ggplot(aes(x = Country, y = value, fill = Phase)) +
+  geom_col() +
+  theme_minimal() +
+  labs(
+    title = "Somalia is Currently Among the Worst IPC Countries",
+    subtitle = "Most Recent 2026 IPC/CH Classification by Country, % of Population",
+    x = "",
+    y = "",
+    fill = "") +
+  coord_flip() +
+  scale_fill_manual(
+  values = c('#e3f6fd', '#b6d4f1', '#8b6486', '#7f3f4d', '#691b15'),
+  labels = c("Phase.1" = "Phase 1", "Phase.2" = "Phase 2", "Phase.3" = "Phase 3", "Phase.4" = "Phase 4", "Phase.5" = "Phase 5")) +
+  scale_y_continuous(breaks = seq(0, 1, by = .20), labels = scales::percent)
+
+ipc_dashboard_plot
+```
+
+Most recent IPC/CH classification by country, showing the share of population in each phase. Somalia ranks among the most severe globally.
+
+
+---
+
+## Stunting 
+```{r Loading in Data, message=FALSE, echo = FALSE, warning = FALSE}
+stunting_modeled <- wbstats::wb_data(indicator = "SH.STA.STNT.ME.ZS",
+                                     start_date = 2000,
+                                     end_date = 2026,
+                                     lang = "en",
+                                     country = benchmarks)
+
+
+stunting <- wbstats::wb_data(indicator = "SH.STA.STNT.ME.ZS", country = "countries_only")
+stunt_progress_results <- suppressWarnings(track_progress(
+  data = stunting,
+  indicator = "SH.STA.STNT.ME.ZS",
+  code_col = "iso3c",
+  year_col = "date",
+  startyear_data = 2000,
+  endyear_data = 2024,
+  eval_from = 2015,
+  eval_to = 2023,
+  speed = TRUE,
+  percentiles = FALSE,
+  future =  FALSE,
+  target_year = 2030,
+  sequence_pctl = seq(20, 80, 20),
+  sequence_speed = c(0.25, 0.5, 1, 2, 4),
+  best = "low",
+  support = 1,
+  granularity = 0.01
+))
+```
+
+```{r Create Viz, echo=FALSE, message=FALSE, warning=FALSE}
+stunting_modeled_plot <- stunting_modeled |>
+  filter(date <= max(date[!is.na(SH.STA.STNT.ME.ZS)])) |>
+  mutate(label = if_else(date == max(date), as.character(country), NA_character_),
+         highlight = (iso3c == "SOM")) |>
+  ggplot(aes(x=date, y = SH.STA.STNT.ME.ZS, group = country, color = highlight)) +
+  theme_minimal() +
+  geom_line(linewidth = 0.75) +
+  labs(
+    title = "Prevalence of Stunting, (% of Population)",
+    x = "",
+    y = "",
+    color = "Country/Grouping") +
+    annotate("text",
+           x = 2021, 
+           y = 46,
+           label = "2024: Data ends",
+           fontface = "italic",
+           size = 3.5) +
+  geom_vline(xintercept = 2024, linetype = "dashed", color = "black") +
+  theme(
+    legend.position = "none") +
+  scale_color_manual(values = c("#8A969F", "#0071BC")) +
+  geom_label_repel(aes(label = label),
+                  nudge_x = 7.5,
+                  direction = "y",
+                  hjust = 0.5,
+                  segment.color = NA,
+                  na.rm = TRUE)
+  
+# ggsave("Visualizations/Modeled_Stunting.png")
+stunting_modeled_plot
+```
+
+Somalia's stunting prevalence compared to regional and income-group averages, 2000–2024.
+
+```{r, echo = FALSE, warning = FALSE}
+#Line Chart with FCS Countries
+stunting_modeled <- wbstats::wb_data(indicator = "SH.STA.STNT.ME.ZS",
+                                     start_date = 2000,
+                                     end_date = 2026,
+                                     lang = "en",
+                                     country = fcs_codes)
+
+stunting_modeled_plot_fcs <- stunting_modeled |>
+  filter(date <= max(date[!is.na(SH.STA.STNT.ME.ZS)])) |>
+  mutate(label = if_else(date == max(date) & (iso3c == "SOM"), as.character(country), NA_character_),
+         highlight = (iso3c == "SOM")) |>
+  ggplot(aes(x=date, y = SH.STA.STNT.ME.ZS, group = country, color = highlight)) +
+  theme_minimal() +
+  geom_line(linewidth = 0.75) +
+  labs(
+    title = "Prevalence of Stunting, (% of Population)",
+    x = "",
+    y = "",
+    color = "Country/Grouping") +
+    annotate("text",
+           x = 2021, 
+           y = 61.5,
+           label = "2024: Data ends",
+           fontface = "italic",
+           size = 3.5) +
+  geom_vline(xintercept = 2024, linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("#8A969F", "#0071BC"),
+                     labels = c("TRUE" = "Somalia", "FALSE" = "FCS Countries"))
+  
+
+# ggsave("Visualizations/Modeled_Stunting.png")
+stunting_modeled_plot_fcs
+
+```
+
+Somalia's stunting rate against individual FCS country peers, 2000–2024.
+
+```{r, echo = FALSE, warning = FALSE}
+
+stunting_arrow <- stunting_modeled |>
+  select(country, date, SH.STA.STNT.ME.ZS) |>
+  filter(date == 2024 | date == 2015) |>
+  mutate(SH.STA.STNT.ME.ZS = SH.STA.STNT.ME.ZS / 100) |>
+  pivot_wider(names_from = date, values_from = SH.STA.STNT.ME.ZS, names_prefix = "stunt_") |>
+  mutate(highlight = (country == "Somalia, Fed. Rep."))
+
+stunting_arrow_plot1 <- stunting_arrow |>
+  ggplot() +
+  geom_segment(aes(x = reorder(country, -stunt_2024), xend = reorder(country, stunt_2024),
+                   y = stunt_2015, yend = stunt_2024, color = highlight),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed")) +
+  geom_point(aes(x = reorder(country, -stunt_2024), y = stunt_2015, color = highlight), size = 1) +
+  scale_color_manual(
+    values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+    labels = c("TRUE" = "Somalia", "FALSE" = "FCS Countries"),
+    name = NULL
+  ) +
+  labs(x = "",
+       y = "",
+       title = "Prevalence of Stunting Change from 2015-2024",
+       subtitle = "% of Population, Sorted by End Year Value") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+stunting_arrow_plot1
+
+
+stunting_arrow_plot2 <- stunting_arrow |>
+  ggplot() +
+  geom_segment(aes(x = reorder(country, -stunt_2015), xend = reorder(country, stunt_2015),
+                   y = stunt_2015, yend = stunt_2024,
+                   color = highlight),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed")) +
+  geom_point(aes(x = reorder(country, -stunt_2015), y = stunt_2015, color = highlight), size = 1) +
+  scale_color_manual(
+    values = c("TRUE" = "#0071BC", "FALSE" = "#8A969F"),
+    labels = c("TRUE" = "Somalia", "FALSE" = "FCS Countries"),
+    name = NULL
+  ) +
+  labs(x = "",
+       y = "",
+       title = "Prevalence of Stunting Change from 2015-2024",
+       subtitle = "% of Population, Sorted by Start Year Value") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip()
+stunting_arrow_plot2
+
+```
+
+Change in stunting prevalence across FCS countries from 2015 to 2024, ranked by 2024 rate and 2015 rate. Somalia falls in the middle of the group.
+
+
+
+
+---
+
+## Speed of Progress
+### Undernourishment
+```{r Getting Data, message = FALSE, echo = FALSE}
+data <- wbstats::wb_data(indicator = "SN.ITK.DEFC.ZS", lang = "en", country = "countries_only")
+progress_results <- suppressWarnings(track_progress(data = data,
+                                   indicator = "SN.ITK.DEFC.ZS",
+                                   code_col = "iso3c",
+                                   year_col = "date",
+                                   startyear_data = 2001,
+                                   endyear_data = 2023,
+                                   eval_from = 2015,
+                                   eval_to = 2023, 
+                                   speed = TRUE,
+                                   percentiles = FALSE,
+                                   future = FALSE, ## TRUE,
+                                   target_year = 2030,
+                                   sequence_pctl = seq(20,80,20),
+                                   sequence_speed = c(0.25, 0.5, 1, 2, 4),
+                                   best = "low",
+                                   support = 1,
+                                   granularity = 0.01))
+
+
+## Cleaning
+score_speed <- classifications |>
+  select(Economy, Code) |>
+  right_join(progress_results$scores$speed, by = c("Code" = "code")) |>
+  rename("country" = Economy, "code" = Code)
+
+score_speed_fcs_separate <- score_speed |>
+  filter(code %in% fcs_codes) |>
+  mutate(country = fct_reorder(country, score)) |>
+  mutate(issomalia = (code == "SOM"))
+```
+
+
+```{r Creating plot, echo = FALSE}
+fcs_pou_plot <- score_speed_fcs_separate |>
+  ggplot(aes(x = country, y = score, fill = issomalia)) + geom_bar(stat="identity") +
+  theme_minimal() +
+  coord_flip() +
+  labs(
+    title = "Speed of Progress Measured from 2015-2023",
+    subtitle = "2026 FCV Countries",
+    y = "Speed of Progress",
+    x = ""
+  ) +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("#8A969F", "#0071BC")) +
+  theme(plot.subtitle = element_text(face = "italic"))
+fcs_pou_plot
+ggsave("Visualizations/FCV_PoU.png", width = 7, height = 5)
+```
+
+Speed of Progress of undernourishment for Somalia and other FCS Countries, 2015–2023. Speed of progress is calculated by taking historical data, generating a "typical development" path, and comparing the rate of improvement from a given start point. Higher values indicate faster improvement. Despite have a speed score of < 1, it is clear that Somalia is faring better than most FCS Countries.
+
+### Stunting
+```{r Creating plot for stunt, echo = FALSE}
+fcs_stunt_plot <- stunt_progress_results$scores$speed |>
+  filter(code %in% fcs_codes) |>
+  mutate(highlight = (code == "SOM")) |>
+  left_join(classifications, by = c("code" = "Code")) |>
+  mutate(Economy = fct_reorder(Economy, score)) |>
+  ggplot(aes(x = Economy, y = score, fill = highlight)) + 
+  theme_minimal() +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Speed of Progress from 2015-2023: Stunting",
+    subtitle = "2026 FCS Countries",
+    y = "Speed of Progress",
+    x = ""
+  ) +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("#8A969F", "#0071BC"))
+fcs_stunt_plot
+```
+
+The same graph as above but with stunting.
+
+
+---
+
+## Typical Path for Undernourishment and Stunting with Entire World
+### Undernourishment
+``` {r World Undernourishment, message = FALSE, echo = FALSE, warning = FALSE}
+
+## running on undernourishment track progress
+data <- wbstats::wb_data(indicator = "SN.ITK.DEFC.ZS", lang = "en", country = "countries_only")
+progress_results <- suppressWarnings(track_progress(data = data,
+                                   indicator = "SN.ITK.DEFC.ZS",
+                                   code_col = "iso3c",
+                                   year_col = "date",
+                                   startyear_data = 2001,
+                                   endyear_data = 2023,
+                                   eval_from = 2015,
+                                   eval_to = 2023, 
+                                   speed = TRUE,
+                                   percentiles = FALSE,
+                                   future = FALSE, ## TRUE,
+                                   target_year = 2030,
+                                   sequence_pctl = seq(20,80,20),
+                                   sequence_speed = c(0.25, 0.5, 1, 2, 4),
+                                   best = "low",
+                                   support = 1,
+                                   granularity = 0.01))
+
+check <- progress_results$scores$speed
+path_speed  <- progress_results$predicted_changes$path_speed
+
+## Combining and Plotting Somalia's path and the typical path
+pou_som <- pou |>
+  mutate(year = as.numeric(year)) |>
+  filter(Country.Code == "SOM",
+         year >= 2015) |>
+  mutate(time = as.numeric(year) - 2015) |>
+  arrange(time)
+pou_som_yr_offset <- as.numeric(path_speed[which.min(abs(path_speed$y-pou_som$value[1])), "time"])
+pou_som <- pou_som |>
+  mutate(time = time + pou_som_yr_offset, 
+         label = if_else(year == max(year) | year == min(year), as.character(year), NA_character_))
+
+combined_path_speed <- path_speed |>
+  mutate(Country.Name = "Typical Path") |>
+  rename("value" = y) |>
+  full_join(pou_som, by = c("Country.Name", "time", "value"))
+
+
+combined_path_speed_plot <- combined_path_speed |>
+  ggplot(aes(x = time, y = value, color = Country.Name)) +
+  geom_line(linewidth = 0.9) +
+  theme_minimal() +
+  labs(
+    title = "Worldwide Typical Development Path",
+    subtitle = "Prevalence of Undernourishment, % of Population",
+    x = "Years of Progress",
+    y = "",
+    color = "") +
+  scale_color_manual(values = c("#0071BC", "#111111")) +
+  geom_line(data = combined_path_speed |> filter(Country.Name != "Typical Path"), linewidth = 1.25, color = "#0071BC") +
+  geom_label_repel(aes(label = label),
+                  nudge_x = 6,
+                  show.legend = FALSE)
+
+combined_path_speed_plot
+```
+
+Somalia's progress from 2015-2023 in undernourishment rates positioned on the typical development path, which maps how countries have historically reduced undernourishment as they develop.
+
+```{r, echo = FALSE, warning = FALSE}
+## FCS Countries
+
+fcs_pou <- wbstats::wb_data(c( "pou" = "SN.ITK.DEFC.ZS"), country = fcs_codes) |>
+  select(country, date, pou) |>
+  filter(date >= 2015 & !is.na(pou))
+
+offsets <- fcs_pou |>
+  group_by(country) |>
+  slice_min(date, n = 1) |>  # first observation per country
+  ungroup() |>
+  rowwise() |>
+  mutate(yr_offset = as.numeric(path_speed[which.min(abs(path_speed$y - pou)), "time"])) |>
+  ungroup() |>
+  select(country, yr_offset)
+
+fcs_pou <- fcs_pou |>
+  left_join(offsets, by = "country") |>
+  mutate(time = (date - 2015) + yr_offset) |>
+  select(country, time, pou)
+
+fcs_wld_pou <- path_speed |>
+  mutate(country = "Typical Path") |>
+  rename("pou" = y) |>
+  full_join(fcs_pou, by = c("country", "time", "pou"))
+
+
+typical_path <- fcs_wld_pou |> filter(country == "Typical Path")
+fcs_countries <- fcs_wld_pou |> filter(!country %in% c("Typical Path", "Somalia"))
+somalia <- fcs_wld_pou |> filter(country == "Somalia, Fed. Rep.")
+
+fcs_wld_pou_plot <- ggplot() +
+  geom_line(data = typical_path, aes(x = time, y = pou), 
+            color = "#111111", linewidth = 0.9) +
+  geom_line(data = fcs_countries, aes(x = time, y = pou, group = country), 
+            color = "#8A969F", linewidth = 0.5) +
+  geom_line(data = somalia, aes(x = time, y = pou), 
+            color = "#0071BC", linewidth = 1.25) +
+  # dummy data for legend
+  geom_line(data = data.frame(time = NA, pou = NA, label = factor(c("Typical Path", "FCS Countries", "Somalia, Fed. Rep."))),
+            aes(x = time, y = pou, color = label)) +
+  scale_color_manual(values = c("Typical Path" = "#111111", "FCS Countries" = "#8A969F", "Somalia, Fed. Rep." = "#0071BC")) +
+  theme_minimal() +
+  labs(
+    title = "For FCV Countries, Being Average is Above Average",
+    subtitle = "Typical Development Path for Prevalence of Undernourishment, as a % of Population",
+    x = "Years of Progress",
+    y = "",
+    color = "") +
+  theme(plot.subtitle = element_text(face = "italic"))
+fcs_wld_pou_plot
+ggsave("Visualizations/FCV_SoP_PoU.png", width = 7, height = 5)
+
+
+
+
+```
+
+FCS country trajectories overlaid on the typical development path for undernourishment, 2015–2023. Many of the countries trend upward, signalling a regression in this indicator.
+
+### Stunting
+``` {r World Stunting, message = FALSE, echo = FALSE, warning = FALSE}
+
+## running on stunting track progress
+data <- stunting
+progress_results <- suppressWarnings(track_progress(data = data,
+                                   indicator = "SH.STA.STNT.ME.ZS",
+                                   code_col = "iso3c",
+                                   year_col = "date",
+                                   startyear_data = 1960,
+                                   endyear_data = 2025,
+                                   eval_from = 2015,
+                                   eval_to = 2023, 
+                                   speed = TRUE,
+                                   percentiles = FALSE,
+                                   future = FALSE, ## TRUE,
+                                   target_year = 2030,
+                                   sequence_pctl = seq(20,80,20),
+                                   sequence_speed = c(0.25, 0.5, 1, 2, 4),
+                                   best = "low",
+                                   support = 1,
+                                   granularity = 0.01))
+
+
+check <- progress_results$scores$speed
+path_speed  <- progress_results$predicted_changes$path_speed
+
+## Combining and Plotting Somalia's path and the typical path
+path_speed  <- progress_results$predicted_changes$path_speed
+
+stunt_som <- stunting |>
+  filter(iso3c == "SOM", 
+         date >= 2015,
+         !is.na(SH.STA.STNT.ME.ZS)) |>
+  mutate(time = date - 2015) |>
+  arrange(time) |>
+  select(country, SH.STA.STNT.ME.ZS, time, date)
+
+stunt_som_yr_offset <- as.numeric(path_speed[which.min(abs(path_speed$y-stunt_som$SH.STA.STNT.ME.ZS[1])), "time"])
+
+stunt_som <- stunt_som |>
+  mutate(time = time + stunt_som_yr_offset,
+         label = if_else(date == max(date) | date == min(date), as.character(date), NA_character_))
+
+combined_path_speed <- path_speed |>
+  mutate(country = "Typical Path") |>
+  rename("SH.STA.STNT.ME.ZS" = y) |>
+  full_join(stunt_som, by = c("country", "time", "SH.STA.STNT.ME.ZS"))
+  
+combined_path_speed_plot <- combined_path_speed |>
+  ggplot(aes(x = time, y = SH.STA.STNT.ME.ZS, color = country)) +
+  geom_line(linewidth = 0.9) +
+  theme_minimal() +
+  labs(
+    title = "Worldwide Typical Development Path",
+    subtitle = "Prevalence of stunting, height for age (modeled estimate, % of children under 5)",
+    x = "Years of Progress",
+    y = "",
+    color = "") +
+  scale_color_manual(values = c("#0071BC", "#111111")) +
+  geom_line(data = combined_path_speed |> filter(country != "Typical Path"), linewidth = 1.25, color = "#0071BC") +
+  geom_label_repel(aes(label = label),
+                  nudge_x = 6,
+                  show.legend = FALSE)
+  
+combined_path_speed_plot
+```
+
+Somalia's 2015-2024 stunting rate progress on the global typical development path.
+
+```{r, echo = FALSE, warning = FALSE}
+## FCS Countries
+
+fcs_stunt <- wbstats::wb_data(c( "stunt" = "SH.STA.STNT.ME.ZS"), country = fcs_codes) |>
+  select(country, date, stunt) |>
+  filter(date >= 2015 & !is.na(stunt))
+
+offsets <- fcs_stunt |>
+  group_by(country) |>
+  slice_min(date, n = 1) |>  # first observation per country
+  ungroup() |>
+  rowwise() |>
+  mutate(yr_offset = as.numeric(path_speed[which.min(abs(path_speed$y - stunt)), "time"])) |>
+  ungroup() |>
+  select(country, yr_offset)
+
+fcs_stunt <- fcs_stunt |>
+  left_join(offsets, by = "country") |>
+  mutate(time = (date - 2015) + yr_offset) |>
+  select(country, time, stunt)
+
+fcs_wld_stunt <- path_speed |>
+  mutate(country = "Typical Path") |>
+  rename("stunt" = y) |>
+  full_join(fcs_stunt, by = c("country", "time", "stunt"))
+
+
+typical_path <- fcs_wld_stunt |> filter(country == "Typical Path")
+fcs_countries <- fcs_wld_stunt |> filter(!country %in% c("Typical Path", "Somalia"))
+somalia <- fcs_wld_stunt |> filter(country == "Somalia, Fed. Rep.")
+
+fcs_wld_stunt_plot <- ggplot() +
+  geom_line(data = typical_path, aes(x = time, y = stunt), 
+            color = "#111111", linewidth = 0.9) +
+  geom_line(data = fcs_countries, aes(x = time, y = stunt, group = country), 
+            color = "#8A969F", linewidth = 0.5) +
+  geom_line(data = somalia, aes(x = time, y = stunt), 
+            color = "#0071BC", linewidth = 1.25) +
+  # dummy data for legend
+  geom_line(data = data.frame(time = NA, stunt = NA, label = factor(c("Typical Path", "FCS Countries", "Somalia, Fed. Rep."))),
+            aes(x = time, y = stunt, color = label)) +
+  scale_color_manual(values = c("Typical Path" = "#111111", "FCS Countries" = "#8A969F", "Somalia, Fed. Rep." = "#0071BC")) +
+  theme_minimal() +
+  labs(
+    title = "FCS Country Development Paths 2015-2023",
+    subtitle = "Prevalence of Undernourishment, % of Population",
+    x = "Years of Progress",
+    y = "",
+    color = ""
+  )
+fcs_wld_stunt_plot
+
+```
+
+FCS country trajectories on the typical stunting development path, 2015–2024.
+
+---
+
+
+```{r FCS Undernourishment, message = FALSE, include = FALSE}
+
+## running on undernourishment track progress
+data <- wbstats::wb_data(indicator = "SN.ITK.DEFC.ZS", lang = "en", country = "countries_only") |>
+  filter(iso3c %in% fcs_codes)
+progress_results <- suppressWarnings(track_progress(data = data,
+                                   indicator = "SN.ITK.DEFC.ZS",
+                                   code_col = "iso3c",
+                                   year_col = "date",
+                                   startyear_data = 2001,
+                                   endyear_data = 2023,
+                                   eval_from = 2015,
+                                   eval_to = 2023, 
+                                   speed = TRUE,
+                                   percentiles = FALSE,
+                                   future = FALSE, ## TRUE,
+                                   target_year = 2030,
+                                   sequence_pctl = seq(20,80,20),
+                                   sequence_speed = c(0.25, 0.5, 1, 2, 4),
+                                   best = "low",
+                                   support = 1,
+                                   granularity = 0.01))
+
+check <- progress_results$scores$speed
+path_speed  <- progress_results$predicted_changes$path_speed
+
+## Combining and Plotting Somalia's path and the typical path
+pou_som <- pou |>
+  mutate(year = as.numeric(year)) |>
+  filter(Country.Code == "SOM",
+         year >= 2015) |>
+  mutate(time = as.numeric(year) - 2015) |>
+  arrange(time)
+pou_som_yr_offset <- as.numeric(path_speed[which.min(abs(path_speed$y-pou_som$value[1])), "time"])
+pou_som <- pou_som |>
+  mutate(time = time + pou_som_yr_offset)
+
+combined_path_speed <- path_speed |>
+  mutate(Country.Name = "Typical Path") |>
+  rename("value" = y) |>
+  full_join(pou_som, by = c("Country.Name", "time", "value"))
+  
+combined_path_speed_plot <- combined_path_speed |>
+  ggplot(aes(x = time, y = value, color = Country.Name)) +
+  geom_line() +
+  theme_minimal() +
+  labs(
+    title = "FCS Typical Development Path",
+    subtitle = "Prevalence of Undernourishment, % of Population",
+    x = "Years",
+    y = "",
+    color = "") +
+  scale_color_manual(values = c("#0071BC", "#8A969F"))
+  
+# combined_path_speed_plot
+```
+
+``` {r FCS Stunting, message = FALSE, include = FALSE}
+
+## running on stunting track progress
+data <- stunting |>
+  filter(iso3c %in% fcs_codes)
+progress_results <- suppressWarnings(track_progress(data = data,
+                                   indicator = "SH.STA.STNT.ME.ZS",
+                                   code_col = "iso3c",
+                                   year_col = "date",
+                                   startyear_data = 1960,
+                                   endyear_data = 2025,
+                                   eval_from = 2015,
+                                   eval_to = 2023, 
+                                   speed = TRUE,
+                                   percentiles = FALSE,
+                                   future = FALSE, ## TRUE,
+                                   target_year = 2030,
+                                   sequence_pctl = seq(20,80,20),
+                                   sequence_speed = c(0.25, 0.5, 1, 2, 4),
+                                   best = "low",
+                                   support = 1,
+                                   granularity = 0.01))
+
+
+check <- progress_results$scores$speed
+path_speed  <- progress_results$predicted_changes$path_speed
+
+## Combining and Plotting Somalia's path and the typical path
+path_speed  <- progress_results$predicted_changes$path_speed
+
+stunt_som <- stunting |>
+  filter(iso3c == "SOM", 
+         date >= 2015) |>
+  mutate(time = date - 2015) |>
+  arrange(time) |>
+  select(country, SH.STA.STNT.ME.ZS, time)
+
+stunt_som_yr_offset <- as.numeric(path_speed[which.min(abs(path_speed$y-stunt_som$SH.STA.STNT.ME.ZS[1])), "time"])
+
+stunt_som <- stunt_som |>
+  mutate(time = time + stunt_som_yr_offset)
+
+combined_path_speed <- path_speed |>
+  mutate(country = "Typical Path") |>
+  rename("SH.STA.STNT.ME.ZS" = y) |>
+  full_join(stunt_som, by = c("country", "time", "SH.STA.STNT.ME.ZS"))
+  
+combined_path_speed_plot <- combined_path_speed |>
+  ggplot(aes(x = time, y = SH.STA.STNT.ME.ZS, color = country)) +
+  geom_line() +
+  theme_minimal() +
+  labs(
+    title = "FCS Typical Development Path",
+    subtitle = "Prevalence of stunting, height for age (modeled estimate, % of children under 5)",
+    x = "Years",
+    y = "",
+    color = "") +
+  scale_color_manual(values = c("#0071BC", "#8A969F"))
+  
+# combined_path_speed_plot
+
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r testing things, include = FALSE}
+somalia_world_hunger <- wbstats::wb_data(indicator = c(pop = "SP.POP.TOTL", mod_sev = "SN.ITK.MSFI.ZS"),
+                                         country = c("SOM", "WLD"))
+
+somalia_world_hunger <- somalia_world_hunger |>
+  filter(date == "2021") |>
+  mutate(num_hunger = (mod_sev / 100) * pop)
+
+s
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

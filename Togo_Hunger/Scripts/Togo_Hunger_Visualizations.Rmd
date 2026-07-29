@@ -524,7 +524,7 @@ fcs_pou_plot <- score_speed_afw_separate |>
   coord_flip() +
   labs(
     title = "Speed of Progress Measured from 2015-2023",
-    subtitle = "2026 FCV Countries",
+    subtitle = "Africa West and Central",
     y = "Speed of Progress",
     x = ""
   ) +
@@ -549,7 +549,7 @@ fcs_stunt_plot <- stunt_progress_results$scores$speed |>
   coord_flip() +
   labs(
     title = "Speed of Progress from 2015-2023: Stunting",
-    subtitle = "2026 FCS Countries",
+    subtitle = "Africa West and Central",
     y = "Speed of Progress",
     x = ""
   ) +
@@ -1110,7 +1110,6 @@ agri_index_aggs_plot <- faostat_prod_indicies |>
   theme(legend.position = "none") +
   scale_x_continuous(breaks = seq(2000, max(faostat_prod_indicies$date), by = 5))
 agri_index_aggs_plot
-
 
  
 ```
