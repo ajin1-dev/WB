@@ -1,4 +1,4 @@
-sdg,indicatorname,indicatorshort,wbstats_access,indicator_wdi,indicator,col_name,indicator_sdg,min,max,more_is_better,target_value,start_prog_eval,end_prog_eval,granularity,support,extreme_percentile,unit,rounding,source,in_dashboard
+sdg,indicatorname,indicatorshort,wbstats_access,indicator_wdi,indicator,col_name,indicator_sdg,min,max,more_is_better,target_value,start_prog_eval,end_prog_eval,granularity,support,extreme_percentile,unit,rounding,raw_file_name,in_dashboard
 1,Poverty headcount ratio at $2.15 a day (2017 PPP) (% of population),Extreme poverty rate,0,SI.POV.DDAY,SI.POV.DDAY,SI.POV.DDAY,1.1.1,0,100,0,3,2015,2025,0.01,1,"c(0.02, 0.02)",% of population,1,poverty.Rda,1
 4,Expected years of school,Expected Years of School,0,,HCI_EYRS,education,4.1.2,NULL,NULL,1,13,2015,2025,0.1,1,"c(0.02, 0.02)",years,1,education.Rda,1
 5,"Labor force participation rate, female (% of female population ages 15-64) (modeled ILO estimate)",Female labor force participation rate,1,SL.TLF.ACTI.FE.ZS,SL.TLF.ACTI.FE.ZS,SL.TLF.ACTI.FE.ZS,8.5.1,NULL,NULL,1,80,2015,2024,0.1,1,"c(0.02, 0.02)",% of female population ages 15-64,1,wbstats,1

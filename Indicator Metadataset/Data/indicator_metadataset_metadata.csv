@@ -1,0 +1,28 @@
+﻿Variable,Description
+country,Country
+code,Country ISO code
+year,Year
+population,Population
+va_estimate,WGI: Voice and Accountability - std dev from mean  (1996-2024)
+va_score,WGI: Voice and Accountability - standardized score (0-100) (1996-2024)
+pv_estimate,WGI: Political Stability - std dev from mean (1996-2024)
+pv_score,WGI: Political Stability - standardized score (0-100) (1996-2024)
+ge_estimate,WGI: Government Effectiveness - std dev from mean (1996-2024)
+ge_score,WGI: Government Effectiveness - standardized score (0-100) (1996-2024)
+rq_estimate,WGI: Regulatory Quality - std dev from mean (1996-2024)
+rq_score,WGI: Regulatory Quality - standardized score (0-100) (1996-2024)
+rl_estimate,WGI: Rule of Law - std dev from mean (1996-2024)
+rl_score,WGI: Rule of Law  - standardized score (0-100) (1996-2024)
+cc_estimate,WGI: Control of Corruption - std dev from mean (1996-2024)
+cc_score,WGI: Control of Corruption - standardized score (0-100) (1996-2024)
+debt_stock_gdp,"General Government Debt Stock (Millions of Current USD), % of GDP (MPO) (1980-2028)"
+pol_violence_events,Number of political violence events by country-year (ACLED) (1997-2026)
+fatalities_pc,Number of reported fatalities by country-year per capita (ACLED) (1997-2026)
+oda_pc,Net official development assistance and official aid received per capita constant 2023 USD (WDI) 
+youth_lfp,"Labor force participation rate for ages 15-24, total (%) (ILO) (1990-2025)"
+neet,"Share of youth not in education, employment or training, total (% of youth population) (ILO Est.)  (2005-2025)"
+expend_gdp,Government expenditure on social protection: Budgetary Central Government or Central government (excl. social security)  (IMF_GFS) (1990-2023)
+female_lfp,"Labor force participation rate, female (% of female population ages 15+) (ILO) (1990-2025)"
+credit_gdp,Domestic credit to private sector (% of GDP) (IMF) (1960-2024)
+trade_gdp,Trade (% of GDP) (WDI) (1960-2024)
+fdi_gdp,"Foreign direct investment, net inflows (% of GDP) (IMF,WB) (1970-2024)"
