@@ -1,0 +1,51 @@
+## running on stunting track progress with just the fcs countries
+data <- stunting |>
+  filter(iso3c %in% fcs_codes)
+
+progress_results <- suppressWarnings(track_progress(data = data,
+                                   indicator = "SH.STA.STNT.ME.ZS",
+                                   code_col = "iso3c",
+                                   year_col = "date",
+                                   startyear_data = 2001,
+                                   endyear_data = 2023,
+                                   eval_from = 2015,
+                                   eval_to = 2023, 
+                                   speed = TRUE,
+                                   percentiles = FALSE,
+                                   future = FALSE, ## TRUE,
+                                   target_year = 2030,
+                                   sequence_pctl = seq(20,80,20),
+                                   sequence_speed = c(0.25, 0.5, 1, 2, 4),
+                                   best = "low",
+                                   support = 1,
+                                   granularity = 0.01))
+
+check <- progress_results$scores$speed
+path_speed  <- progress_results$predicted_changes$path_speed
+
+stunt_som <- stunting |>
+  filter(iso3c == "SOM", 
+         date >= min(date[!is.na(SH.STA.STNT.ME.ZS)])) |>
+  mutate(time = date - min(date, na.rm = TRUE)) |>
+  arrange(time) |>
+  select(country, SH.STA.STNT.ME.ZS, time)
+stunt_som_yr_offset <- as.numeric(path_speed[which.min(abs(path_speed$y-stunt_som$SH.STA.STNT.ME.ZS[1])), "time"])
+stunt_som <- stunt_som |>
+  mutate(time = time + stunt_som_yr_offset)
+
+combined_path_speed <- path_speed |>
+  mutate(country = "Typical Path") |>
+  rename("SH.STA.STNT.ME.ZS" = y) |>
+  full_join(stunt_som, by = c("country", "time", "SH.STA.STNT.ME.ZS"))
+  
+combined_path_speed_plot <- combined_path_speed |>
+  ggplot(aes(x = time, y = SH.STA.STNT.ME.ZS, color = country)) +
+  geom_line() +
+  theme_minimal() +
+  labs(
+    title = "Rate of Progress from 2015-2023, FCS Countries",
+    y = "Stunting",
+    x = ""
+  )
+combined_path_speed_plot
+

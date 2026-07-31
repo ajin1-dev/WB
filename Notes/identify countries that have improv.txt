@@ -1,0 +1,88 @@
+identify countries that have improved past ten years speed is >1.5 carribean, SSA
+
+at least 1-2% change over 10 yrs
+
+update data in file for globabl regional
+
+
+most recent value for 
+
+not using acled, undernourishment people, income, time series country, fsi, cri
+
+
+run the file see if there is new data, then clean it for unused vizes
+
+
+LOOK AT GAFS DASHBOARD FOR DATA and especially results-based data
+
+
+focus less on specfici programs and more on mechanisms 
+
+fao sdg portal agricultural productivity 
+
+
+for hunger visualizations vizs
+theme_minimal
+add another line chart for only fcs with som highlighted
+remove labels if they are clear
+by population (million) in the title
+remove date
+multiply percents by 100
+
+revise the phase charts so that they are more of a gradient 
+
+progress score for stunting modeled data
+for togo and uganda
+
+replicate rate of progress for Uganda and togo for ssa 
+if possible split into west and east Africa
+
+replicate the sent graph with the arrows and stuff.\
+
+
+
+Then write a lit review blurb, figure out indicators based on the blurb
+shouldn't be more than two pages, can be only one
+
+
+email adobeanalyticssupport@worldbank.org
+
+
+start from 2015
+4 charts
+overall and fcs specific
+	for this undernourish and stunt
+
+make two different geon_lines
+bigger Somalia line
+
+
+Direct Labels on line graphs
+
+"SPEED" of Progress
+
+"Typical Path"
+thicken line
+
+make the dev path with also other fcs in grey and the other in black
+
+line chart of Somalia with the other countries in the background for undernourishment + stunting
+
+
+One stacked bar chart
+one grouped severe + moderate and severe
+One grouped severe + moderate
+
+Revert the colors of the fcs countries but that's it
+
+Just do the the stacked and grouped
+grouped is moderate and severe and severe
+stacked can stay but one with the legends
+lighter colors
+
+fies indicator bar chart
+moderate and severe and severe for fcs
+
+annotate 2015 and 2023 on the typical path
+another one with other fcs countries
+make all paths black

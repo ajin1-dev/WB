@@ -1,0 +1,387 @@
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(trackr)
+
+
+## vectors for benchmarks and makeshift benchmarks
+benchmarks = c("SOM", "SSF", "LIC", "WLD", "FCS")
+classifications <- read_excel("Somalia_Hunger/Data/country_classifications.xlsx")
+low_inc_codes <- classifications |>
+  filter(`Income group` == "Low income") |>
+  pull(Code)
+ssa_codes <- classifications |>
+  filter(Region == "Sub-Saharan Africa") |>
+  pull(Code)
+fcs_codes <- classifications |>
+  filter(Economy %in% c("Afghanistan",
+                        "Burkina Faso",
+                        "Cameroon",
+                        "Central African Republic",
+                        "Congo, Dem. Rep.",
+                        "Ethiopia",
+                        "Haiti",
+                        "Iraq",
+                        "Lebanon",
+                        "Mali",
+                        "Mozambique",
+                        "Myanmar",
+                        "Niger",
+                        "Nigeria",
+                        "Somalia, Fed. Rep.",
+                        "South Sudan",
+                        "Sudan",
+                        "Syrian Arab Republic",
+                        "Ukraine",
+                        "West Bank and Gaza",
+                        "Yemen, Rep.",
+                        "Burundi",
+                        "Chad",
+                        "Comoros",
+                        "Congo, Rep.",
+                        "Eritrea",
+                        "Guinea-Bissau",
+                        "Kiribati",
+                        "Libya",
+                        "Marshall Islands",
+                        "Micronesia, Fed. Sts.",
+                        "Papua New Guinea",
+                        "São Tomé and Príncipe",
+                        "Solomon Islands",
+                        "Timor-Leste",
+                        "Tuvalu",
+                        "Venezuela, RB",
+                        "Zimbabwe"
+                        )) |>
+  pull(Code)
+country_pops <- wbstats::wb_data(indicator = "SP.POP.TOTL", lang = "en", country = "countries_only") |>
+  select(iso3c, SP.POP.TOTL, date) |>
+  rename("code" = iso3c, "population" = SP.POP.TOTL, "year" = date)
+
+
+
+# Load in PoU dataset
+## Prevalence of undernourishment (% of population); ind = SN.ITK.DEFC.ZS
+pou <- read.csv("Somalia_Hunger/Data/API_SN.ITK.DEFC.ZS_DS2_en_csv_v2_331187.csv", skip = 4) |>
+  select(c(Country.Name, Country.Code, "X2001":last_col(offset = 3))) |>
+  filter(Country.Code %in% benchmarks)
+colnames(pou) <- gsub("X", "", colnames(pou))
+pou <- pou |>
+  pivot_longer(cols = "2001":last_col(),
+               names_to = "year",
+               values_to = "value")
+
+# Create PoU visualization
+pou_plot <- pou |> ggplot(aes(x = year, y = value, group = Country.Name, color = Country.Name)) +
+  geom_line() +
+  scale_x_discrete(breaks = seq(2001, 2023, by = 5)) +
+  labs(title = "Prevalence of Undernourishment (% of population)",
+       x = "Year",
+       y = "% Undernourishment",
+       color = "Country/Grouping")
+ggsave("Somalia_Hunger/Visualizations/Pct_Undernourishment.png")
+
+
+
+# Load in FIES Dataset
+## Prevalence of moderate or severe food insecurity in the population (%); ind = SN.ITK.MSFI.ZS
+insecurity_ms<- read.csv("Somalia_Hunger/Data/API_SN.ITK.MSFI.ZS_DS2_en_csv_v2_7955.csv", skip = 4) |>
+  select(c(Country.Name, Country.Code, "X2021")) |>
+  rename(pct = X2021)
+
+## Creating Makeshift Benchmarks
+### world average
+wld_avg_ms <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_ms, by = c("code" = "Country.Code")) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "World", code = "WLD")
+### ssa average
+ssa_avg_ms <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_ms, by = c("code" = "Country.Code")) |>
+  filter(code %in% ssa_codes) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "Sub-Saharan Africa", Country.Code = "SSF")
+### low income average
+lic_avg_ms <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_ms, by = c("code" = "Country.Code")) |>
+  filter(code %in% low_inc_codes) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "Low income", Country.Code = "LIC")
+### fcs average
+fcs_avg_ms <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_ms, by = c("code" = "Country.Code")) |>
+  filter(code %in% fcs_codes) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "FCS Countries", Country.Code = "FCS")
+### Joining to main dataset and filtering
+insecurity_ms <- insecurity_ms |>
+  filter(Country.Code == "SOM") |>
+  bind_rows( wld_avg_ms, ssa_avg_ms, lic_avg_ms, fcs_avg_ms)
+  
+
+
+## Prevalence of severe food insecurity in the population (%); ind = SN.ITK.SVFI.ZS
+insecurity_s <- read.csv("Somalia_Hunger/Data/API_SN.ITK.SVFI.ZS_DS2_en_csv_v2_331188.csv", skip = 4) |>
+  select(c(Country.Name, Country.Code, Indicator.Name, "X2021")) |>
+  rename(pct = X2021)
+
+## Creating Makeshift Benchmarks
+### world average
+wld_avg_s <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_s, by = c("code" = "Country.Code")) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "World", code = "WLD")
+### ssa average
+ssa_avg_s <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_s, by = c("code" = "Country.Code")) |>
+  filter(code %in% ssa_codes) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "Sub-Saharan Africa", Country.Code = "SSF")
+### low income average
+lic_avg_s <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_s, by = c("code" = "Country.Code")) |>
+  filter(code %in% low_inc_codes) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "Low income", Country.Code = "LIC")
+### fcs average
+fcs_avg_s <- country_pops |>
+  filter(year == "2021") |>
+  right_join(insecurity_s, by = c("code" = "Country.Code")) |>
+  filter(code %in% fcs_codes) |>
+  summarize(pct = weighted.mean(pct, population, na.rm = TRUE)) |>
+  mutate(Country.Name = "FCS Countries", Country.Code = "FCS")
+### Joining to main dataset and filtering
+insecurity_s <- insecurity_s |>
+  filter(Country.Code == "SOM") |>
+  bind_rows( wld_avg_s, ssa_avg_s, lic_avg_s, fcs_avg_s)
+
+
+# Create FIES visualizations
+modsev_plot <- insecurity_ms |>
+  ggplot(aes(x = Country.Name, y = pct, fill = Country.Name)) +
+  geom_col() +
+  labs(
+    title = "2021: Prevalence of moderate and severe food insecurity in the population (%)",
+    x = "Country/Grouping",
+    y = "% of population insecure",
+    fill = "Country/Grouping"
+  )
+ggsave("Somalia_Hunger/Visualizations/Mod_Sev_Insecurity.png")
+
+sev_plot <- insecurity_s |>
+  ggplot(aes(x = Country.Name, y = pct, fill = Country.Name)) +
+  geom_col() +
+  labs(
+    title = "2021: Prevalence of severe food insecurity in the population (%)",
+    x = "Country/Grouping",
+    y = "% of population insecure",
+    fill = "Country/Grouping"
+  )
+ggsave("Somalia_Hunger/Visualizations/Sev_Insecurity.png")
+
+
+# Load in IPC data
+ipc0 <- read_excel("Somalia_Hunger/Data/IPC_Population_Analysis_Styled_2017,2027_1781118839874.xlsx") |>
+  select(1:"Current - Phase 3+ %") |>
+  filter(!is.na(`Country Population`) & !is.na(`Current - Analysis Period`)) |>
+  filter(`Country/Analysis Name/Group Name` != "SO: Acute Food Insecurity Analysis January 2026")
+ipc1 <- read_excel("Somalia_Hunger/Data/IPC_Population_Analysis_Styled_2017,2027_1781119874050.xlsx") |>
+  select(1:"Current - Phase 3+ %") |>
+  filter(!is.na(`Country Population`))
+ipc <- bind_rows(ipc0, ipc1)
+ipc <- ipc |> 
+  rename(population = `Country Population`, date = `Date of Analysis`) |>
+  mutate(date = ymd_hms(date))
+
+
+## Data with population
+ipc_pop <- ipc |>
+  select(population, date, ends_with("Pop")) |>
+  rename_with(~gsub("Current - ", "", .x)) |>
+  rename_with(~gsub(" Pop", "", .x))
+ipc_pop <- ipc_pop |>
+  pivot_longer(cols = `Phase 1`:`Phase 3+`,
+               names_to = "phase",
+               values_to = "pop") |>
+  mutate(pop_scaled = pop/1000000)
+
+## Data with percents
+ipc_pct <- ipc |>
+  select(population, date, ends_with("%")) |>
+  rename_with(~gsub("Current - ", "", .x)) |>
+  rename_with(~gsub(" %", "", .x))
+ipc_pct <- ipc_pct |>
+  pivot_longer(cols = `Phase 1`:`Phase 3+`,
+               names_to = "phase",
+               values_to = "pct")
+
+
+# IPC Visualizations
+ipc_pop_plot <- ipc_pop |> filter(phase != "Phase 3+") |>
+  ggplot(aes(x = date, y = pop_scaled, fill = phase)) +
+  geom_area() +
+  labs(
+    title = "IPC Food Insecurity Classifications, by Population",
+    subtitle = "Somalia 2017-2026",
+    x = "Date",
+    y = "Population (Millions)",
+    fill = ""
+  )
+ggsave("Somalia_Hunger/Visualizations/IPC_Phases_Pop.png")
+
+ipc_pct_plot <- ipc_pct |> filter(phase != "Phase 3+") |>
+  ggplot(aes(x = date, y = pct, fill = phase)) +
+    geom_area() +
+  labs(
+    title = "IPC Food Insecurity Classifications, (% of Population)",
+    subtitle = "Somalia 2017-2026",
+    x = "Date",
+    y = "Percent",
+    fill = ""
+  )
+ggsave("Somalia_Hunger/Visualizations/IPC_Phases_Pct.png")
+
+ipc_p3_plot <- ipc_pct |> filter(phase == "Phase 3+") |>
+  ggplot(aes(x = date, y = pct)) + geom_line() +
+  labs(
+    title = ""
+  )
+
+#Stunting
+stunting_modeled <- wbstats::wb_data(indicator = "SH.STA.STNT.ME.ZS",
+                                     start_date = 2000,
+                                     end_date = 2026,
+                                     lang = "en",
+                                     country = benchmarks)
+
+stunting_modeled_plot <- stunting_modeled |>
+  ggplot(aes(x=date, y = SH.STA.STNT.ME.ZS, color = country)) +
+  geom_line(linewidth = 0.75) +
+  labs(
+    title = "Prevalence of Stunting, (% of Population)",
+    x = "Year",
+    y = "Percent",
+    color = "Country/Grouping"
+  )
+ggsave("Somalia_Hunger/Visualizations/Modeled_Stunting.png")
+
+
+
+data <- wbstats::wb_data(indicator = "SN.ITK.DEFC.ZS", lang = "en", country = "countries_only")
+progress_results <- track_progress(data = data,
+                                   indicator = "SN.ITK.DEFC.ZS",
+                                   code_col = "iso3c",
+                                   year_col = "date",
+                                   startyear_data = 2001,
+                                   endyear_data = 2023,
+                                   eval_from = 2018,
+                                   eval_to = 2023, 
+                                   speed = TRUE,
+                                   percentiles = FALSE,
+                                   future = FALSE, ## TRUE,
+                                   target_year = 2030,
+                                   sequence_pctl = seq(20,80,20),
+                                   sequence_speed = c(0.25, 0.5, 1, 2, 4),
+                                   best = "low",
+                                   support = 1,
+                                   granularity = 0.01)
+
+path_speed  <- progress_results$predicted_changes$path_speed
+changes_speed <- progress_results$predicted_changes$changes_speed
+
+typical_value <- progress_results$path_historical$speed
+data_model <- progress_results$data_model$data_model
+historical_path_speed <- progress_results$path_historical$speed
+scores <- progress_results$scores$speed
+
+future <- progress_results$path_future$speed
+
+trial_plot <- path_speed |>
+  ggplot(aes(x = time, y = y)) + geom_line()
+trial_plot
+
+yes <- changes_speed |>
+  ggplot(aes(x = y, y = change)) + geom_line()
+yes
+
+historical_plot <- historical_path_speed |>
+  filter(code == "SOM") |>
+  ggplot(aes(x = year, y = y, color = speed)) +
+  geom_line()
+historical_plot
+
+data_model_plot <- data_model |>
+  filter(code == "SOM") |>
+  ggplot(aes(x = year_start, y = change)) +
+  geom_line()
+data_model_plot
+
+
+score_speed <- classifications |>
+  select(Economy, Code) |>
+  right_join(progress_results$scores$speed, by = c("Code" = "code")) |>
+  rename("country" = Economy, "code" = Code)
+
+score_speed_fcs_separate <- score_speed |>
+  filter(code %in% fcs_codes) |>
+  mutate(country = fct_reorder(country, score)) |>
+  mutate(issomalia = (code == "SOM"))
+
+fcs_score_plot <- score_speed_fcs_separate |>
+  ggplot(aes(x = country, y = score, fill = issomalia)) + geom_bar(stat="identity") +
+  coord_flip() +
+  labs(
+    title = "Rate of Progress from 2018-2023",
+    subtitle = "2026 FCS Countries",
+    y = "Rate of Progress",
+    x = ""
+  ) +
+  theme(legend.position = "none")
+fcs_score_plot
+
+
+
+score_speed_fcs_unweighted <- score_speed |>
+  filter(code %in% fcs_codes) |>
+  summarize(score = mean(score, na.rm = TRUE)) |>
+  mutate(Economy = "FCS Countries", Country.Code = "FCS")
+
+
+
+
+
+
+score_speed_fcs_weighted <- score_speed |>
+  filter(code %in% fcs_codes) |>
+  left_join(country_pops, by = "code") |>
+  mutate(score = score*population) |>
+  summarize(score = sum(score, na.rm = TRUE),
+            population = sum(population, na.rm = FALSE)) |>
+  mutate(score = score/population)
+  mutate(Economy = "FCS Countries", Country.Code = "FCS")
+  
+  
+combined_dataset <- 
+
+pou_som <- pou |>
+  filter(Country.Code == "SOM") |>
+  arrange(year) |>
+  mutate(year = as.numeric(year)) |>
+  mutate(time = year - (2001 - as.numeric(path_speed[which.min(abs(path_speed$y-pou_som$value[1])), "time"])))
+
+combined_path_speed <- path_speed |>
+  mutate(Country.Name = "Typical Path") |>
+  rename("value" = y) |>
+  full_join(pou_som, by = c("Country.Name", "time", "value"))
+  
+combined_path_speed_plot <- combined_path_speed |>
+  ggplot(aes(x = time, y = value, color = Country.Name)) +
+  geom_line()
+  

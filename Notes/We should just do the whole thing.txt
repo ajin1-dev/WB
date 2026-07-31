@@ -1,0 +1,91 @@
+We should just do the whole thing:
+	There should be way less text
+	There is an empirical backbone to this
+"Hey there's this thing called a data story
+
+
+Iran blog voxdev blog women
+
+Because it's interactive the picture/viz is compressed
+
+We have to take this and animate it
+	Pretty/prepared viz, then a button on the side that says interact with it
+
+In the atlas, we have the interactivity first, then we have the button after
+
+We want it like the atlas flfp gender interactivity
+
+The points that we will be making will be pretty much the same
+	due to the brevity of the story
+
+We can just make the blurb smaller and do the scrollers
+
+Each chapter should have an empirical backbone
+
+button for home neighborhood and workplace
+
+We want a data story for each chapter
+	Separate but connected. 
+	Can find it in one page?
+	Need to think about how each of the stories is nested
+
+We want to do an overview datastory 
+	then it is connected to the other data stories
+
+
+How we will make the charts
+	aem (?) for the copy
+	flourish for the vizes
+
+	or 
+	
+	aem for the copy
+	custom vizes published to the posit connect server
+
+	or 
+
+	disregard aem and publish the entire site on the posit connect server
+	(Full atlas approach) will take a longer time
+
+
+We have flourish for doing most of the simple charts
+Then we can do specific ones for more complex vizes
+
+Have to test out with its for things like mobile compatibility
+
+Fully and immersively through the alas
+	published through the atlas
+
+
+Can we make this into a template?
+	Maybe an assembly line mindset?
+
+There will be people who come that don't have as much ready as this report
+
+Pretty but scalable
+
+Goal with this is to maximize potential with aem and flourish
+
+downloadable images and downloadable data within aem
+
+footnotes not possible with aem
+
+Maybe we should just leverage structure of atlas for the current reports
+	We're gonna use the atlas to influence its to adopt these features
+
+Then this would be the atlas approach
+	This would not be scalable
+	every viz is coded from scratch
+
+Can we do a combo of them
+	We can do a flourish component in the atlas charts/structure (?)
+
+Use this to experiment
+
+Is there a potential budget?
+	lol no
+
+
+Will help with the writing
+
+Demographics and Aspire are the other projects

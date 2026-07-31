@@ -1,0 +1,19 @@
+first steps
+
+Use the other food insecurity dataset
+- 
+
+Somalia
+-PoU data
+- FIES
+	Using the FIES data, bo does imputations
+	Divyanshi will sent imputed data
+	combine datasets and create benchmarks
+	global/regional/income benchmarks
+
+looking at the progress piece
+try rosanna's r package to calculate the progress core of undernourishment data
+	prevelance of undernourishment
+	
+
+1. PoU 

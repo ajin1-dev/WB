@@ -1,0 +1,20 @@
+Adobe analytics
+
+Looking at page use by month/week
+average tiem on site
+mobile device not mobile debies
+
+copy exact attributes from other panels
+Unique visits page view
+	within the atlas which is the most popular
+
+Can reuse panel 6 
+	comparing atlas performance with other important reports
+
+
+Three sections: copy of panel 3,4,6 on this panel
+over time 
+by pages
+comparison with other reports
+
+will do the same for gender data

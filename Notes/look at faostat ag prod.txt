@@ -1,0 +1,14 @@
+look at faostat ag prod 
+	specifically cereal crops
+
+
+File Cleaning
+
+Create new files for each sdg indicator
+
+save api call to input folder, then comment that deliberate data file call out of the indicator progress r script
+
+prep file have all the scripts for each indicator calculating progress scores then save into intermediate folder
+
+output folder should only have the outputs to the final folder
+	output folder should look like how it does now
